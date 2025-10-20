@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:app_flutter/core/services/pacientes_service.dart';
+import 'package:app_flutter/core/services/pacientes_store.dart';
 import 'package:app_flutter/core/models/paciente.dart';
 
 class ListaPacientesPage extends StatefulWidget {
@@ -10,34 +10,31 @@ class ListaPacientesPage extends StatefulWidget {
 }
 
 class _ListaPacientesPageState extends State<ListaPacientesPage> {
-  final PacientesService _pacientesService = PacientesService();
-  List<Paciente> _pacientes = [];
-  bool _isLoading = true;
+  final PacientesStore _store = PacientesStore.instance;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _cargarPacientes();
+    _store.refresh();
+    _store.startAutoRefresh(interval: const Duration(seconds: 10));
+  }
+
+  @override
+  void dispose() {
+    _store.stopAutoRefresh();
+    super.dispose();
   }
 
   Future<void> _cargarPacientes() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
     try {
-      final pacientes = await _pacientesService.getPacientes();
-      setState(() {
-        _pacientes = pacientes;
-        _isLoading = false;
-      });
+      await _store.refresh();
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
     }
   }
 
@@ -63,8 +60,8 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
 
     if (confirm == true && paciente.idPaciente != null) {
       try {
-        await _pacientesService.eliminarPaciente(paciente.idPaciente!);
-        
+        await _store.eliminarPaciente(paciente.idPaciente!);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -72,7 +69,6 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
               backgroundColor: Colors.green,
             ),
           );
-          _cargarPacientes(); // Recargar lista
         }
       } catch (e) {
         if (mounted) {
@@ -165,24 +161,34 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: StreamBuilder<List<Paciente>>(
+        stream: _store.stream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            _errorMessage = snapshot.error?.toString();
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Cargando pacientes...'),
+                ],
+              ),
+            );
+          }
+
+          final pacientes = snapshot.data!;
+          return _buildBodyWithPacientes(pacientes);
+        },
+      ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Cargando pacientes...'),
-          ],
-        ),
-      );
-    }
-
+  Widget _buildBodyWithPacientes(List<Paciente> pacientes) {
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -214,7 +220,7 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
       );
     }
 
-    if (_pacientes.isEmpty) {
+    if (pacientes.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -245,9 +251,9 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
       onRefresh: _cargarPacientes,
       child: ListView.builder(
         padding: const EdgeInsets.all(8.0),
-        itemCount: _pacientes.length,
+        itemCount: pacientes.length,
         itemBuilder: (context, index) {
-          final paciente = _pacientes[index];
+          final paciente = pacientes[index];
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
             child: ListTile(

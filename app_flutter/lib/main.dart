@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app_flutter/pages/profile_page.dart';
 import 'package:app_flutter/pages/medical_followup_page.dart';
 import 'package:app_flutter/pages/lista_pacientes_page.dart';
+import 'package:app_flutter/pages/posts_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/followup': (context) => const MedicalFollowupPage(),
         '/lista-pacientes': (context) => const ListaPacientesPage(),
+        '/posts': (context) => const PostsPage(),
       },
       initialRoute: '/',
       debugShowCheckedModeBanner: false,
@@ -76,6 +78,13 @@ class _MyHomePageState extends State<MyHomePage> {
               Navigator.of(context).pushNamed('/followup');
             },
           ),
+          IconButton(
+            tooltip: 'Posts (API pública)',
+            icon: const Icon(Icons.public),
+            onPressed: () {
+              Navigator.of(context).pushNamed('/posts');
+            },
+          ),
         ],
       ),
       body: Center(
@@ -109,6 +118,15 @@ class _MyHomePageState extends State<MyHomePage> {
               label: const Text('Crear Nuevo Paciente'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pushNamed('/posts'),
+              icon: const Icon(Icons.public),
+              label: const Text('Ver Posts (API pública)'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
