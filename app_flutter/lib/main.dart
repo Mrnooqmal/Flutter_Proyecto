@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_flutter/pages/profile_page.dart';
 import 'package:app_flutter/pages/medical_followup_page.dart';
 import 'package:app_flutter/pages/lista_pacientes_page.dart';
@@ -18,6 +19,16 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'ES'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('es', 'ES'),
       routes: {
         '/': (context) => const MyHomePage(title: 'MediTrack - Inicio'),
         '/profile': (context) => const ProfilePage(),

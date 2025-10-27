@@ -9,11 +9,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
   fl_chart: ^1.1.1
   dio: ^5.4.0
-  intl: ^0.19.0
+  intl: ^0.20.2
+  http: ^1.1.0
+  flutter_http_sse: ^1.0.4
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:app_flutter/core/services/pacientes_service.dart';
 import 'package:app_flutter/core/models/paciente.dart';
+import 'dart:async';
 
 class ListaPacientesPage extends StatefulWidget {
   const ListaPacientesPage({super.key});
@@ -14,11 +15,95 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
   List<Paciente> _pacientes = [];
   bool _isLoading = true;
   String? _errorMessage;
+  StreamSubscription? _sseSubscription;
 
   @override
   void initState() {
     super.initState();
     _cargarPacientes();
+    _conectarSSE();
+  }
+
+  @override
+  void dispose() {
+    _sseSubscription?.cancel();
+    _pacientesService.dispose();
+    super.dispose();
+  }
+
+  // conectar a eventos sse del servidor
+  void _conectarSSE() {
+    print('>>> iniciando conexion sse desde lista pacientes');
+    _pacientesService.connectToSSE();
+    
+    _sseSubscription = _pacientesService.sseStream.listen((evento) {
+      print('>>> evento sse recibido en lista: ${evento['event']}');
+      print('>>> datos del evento: ${evento['data']}');
+      
+      final eventType = evento['event'] as String;
+      final data = evento['data'];
+
+      switch (eventType) {
+        case 'paciente_creado':
+          _manejarPacienteCreado(data);
+          break;
+        case 'paciente_actualizado':
+          _manejarPacienteActualizado(data);
+          break;
+        case 'paciente_eliminado':
+          _manejarPacienteEliminado(data);
+          break;
+        default:
+          print('evento desconocido: $eventType');
+      }
+    });
+    
+    print('>>> suscripcion al stream sse configurada');
+  }
+
+  void _manejarPacienteCreado(dynamic data) {
+    print('nuevo paciente: $data');
+    _cargarPacientes();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nuevo paciente: ${data['nombrePaciente'] ?? 'sin nombre'}'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _manejarPacienteActualizado(dynamic data) {
+    print('paciente actualizado: $data');
+    _cargarPacientes();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Paciente actualizado: ${data['nombrePaciente'] ?? 'sin nombre'}'),
+          backgroundColor: Colors.blue,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _manejarPacienteEliminado(dynamic data) {
+    print('paciente eliminado: $data');
+    _cargarPacientes();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Paciente eliminado (ID: ${data['idPaciente']})'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _cargarPacientes() async {

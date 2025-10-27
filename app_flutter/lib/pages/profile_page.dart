@@ -52,7 +52,6 @@ class _ProfilePageState extends State<ProfilePage> {
       initialDate: DateTime(2000),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      locale: const Locale('es', 'ES'),
     );
     
     if (picked != null) {
