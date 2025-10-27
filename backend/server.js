@@ -41,7 +41,7 @@ app.get('/api/pacientes', (req, res) => {
   });
 });
 
-// sse - endpoint para stream de cambios (DEBE IR ANTES de /:id)
+// sse - endpoint para stream de cambios 
 app.get('/api/pacientes/stream', (req, res) => {
   // configurar headers
   res.setHeader('Content-Type', 'text/event-stream');
