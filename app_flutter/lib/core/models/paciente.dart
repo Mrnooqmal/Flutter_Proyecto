@@ -1,6 +1,8 @@
 // lib/core/models/paciente.dart
 
-class Paciente{
+enum Sexo { masculino, femenino, otro }
+
+class Paciente {
   final int? idPaciente;
   final String nombrePaciente;
   final DateTime fechaNacimiento;
@@ -15,7 +17,6 @@ class Paciente{
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  // constructor
   Paciente({
     this.idPaciente,
     required this.nombrePaciente,
@@ -32,7 +33,6 @@ class Paciente{
     this.updatedAt,
   });
 
-  // factory para JSON -> objeto
   factory Paciente.fromJson(Map<String, dynamic> json) {
     return Paciente(
       idPaciente: json['idPaciente'],
@@ -51,16 +51,30 @@ class Paciente{
     );
   }
 
-  // metodo para objeto -> JSON
+  static String normalizarSexo(String? sexo) {
+    if (sexo == null) return 'otro';
+    
+    String sexoLower = sexo.toLowerCase();
+    if (sexoLower == 'm' || sexoLower == 'masculino' || sexoLower.contains('masc')) {
+      return 'masculino';
+    } else if (sexoLower == 'f' || sexoLower == 'femenino' || sexoLower.contains('fem')) {
+      return 'femenino';
+    } else {
+      return 'otro';
+    }
+  }
+
   Map<String, dynamic> toJson() {
+    String sexoNormalizado = normalizarSexo(sexo);
+    
     return {
       if (idPaciente != null) 'idPaciente': idPaciente,
       'nombrePaciente': nombrePaciente,
-      'fechaNacimiento': fechaNacimiento.toIso8601String().split('T')[0], // Solo fecha YYYY-MM-DD
+      'fechaNacimiento': fechaNacimiento.toIso8601String().split('T')[0],
       'correo': correo,
       'telefono': telefono,
       'direccion': direccion,
-      'sexo': sexo,
+      'sexo': sexoNormalizado,
       'nacionalidad': nacionalidad,
       'ocupacion': ocupacion,
       'prevision': prevision,
@@ -68,9 +82,16 @@ class Paciente{
     };
   }
 
-  /// Helper para formatear fecha nacimiento como string legible
   String get fechaNacimientoFormatted {
     return '${fechaNacimiento.day.toString().padLeft(2, '0')}/${fechaNacimiento.month.toString().padLeft(2, '0')}/${fechaNacimiento.year}';
   }
 
+  String get sexoDisplay {
+    switch (sexo.toLowerCase()) {
+      case 'masculino': return 'Masculino';
+      case 'femenino': return 'Femenino';
+      case 'otro': return 'Otro';
+      default: return 'Otro';
+    }
+  }
 }

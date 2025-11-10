@@ -214,18 +214,8 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
     
     DateTime fechaNacimiento = paciente.fechaNacimiento;
     
-    // Normalizar el valor del sexo para que coincida con el dropdown
-    String sexoSeleccionado = paciente.sexo.toUpperCase();
-    if (sexoSeleccionado != 'M' && sexoSeleccionado != 'F' && sexoSeleccionado != 'O') {
-      // Si el valor en BD es "masculino", "femenino", etc., convertir a M/F/O
-      if (paciente.sexo.toLowerCase().contains('masc')) {
-        sexoSeleccionado = 'M';
-      } else if (paciente.sexo.toLowerCase().contains('fem')) {
-        sexoSeleccionado = 'F';
-      } else {
-        sexoSeleccionado = 'O';
-      }
-    }
+    // Normalizar el valor del sexo - usar el método del modelo
+    String sexoSeleccionado = Paciente.normalizarSexo(paciente.sexo);
 
     final resultado = await showDialog<bool>(
       context: context,
@@ -282,9 +272,9 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
                       prefixIcon: Icon(Icons.wc),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'M', child: Text('Masculino')),
-                      DropdownMenuItem(value: 'F', child: Text('Femenino')),
-                      DropdownMenuItem(value: 'O', child: Text('Otro')),
+                      DropdownMenuItem(value: 'masculino', child: Text('Masculino')),
+                      DropdownMenuItem(value: 'femenino', child: Text('Femenino')),
+                      DropdownMenuItem(value: 'otro', child: Text('Otro')),
                     ],
                     onChanged: (value) {
                       if (value != null) {
@@ -292,6 +282,12 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
                           sexoSeleccionado = value;
                         });
                       }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Seleccione un sexo';
+                      }
+                      return null;
                     },
                   ),
                   const SizedBox(height: 12),
@@ -379,18 +375,21 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
       try {
         final pacienteActualizado = Paciente(
           idPaciente: paciente.idPaciente,
-          nombrePaciente: nombreController.text,
+          nombrePaciente: nombreController.text.trim(),
           fechaNacimiento: fechaNacimiento,
           sexo: sexoSeleccionado,
-          correo: emailController.text.isEmpty ? null : emailController.text,
-          telefono: telefonoController.text.isEmpty ? null : telefonoController.text,
-          direccion: direccionController.text.isEmpty ? null : direccionController.text,
-          nacionalidad: nacionalidadController.text.isEmpty ? null : nacionalidadController.text,
-          ocupacion: ocupacionController.text.isEmpty ? null : ocupacionController.text,
-          prevision: previsionController.text.isEmpty ? null : previsionController.text,
-          tipoSangre: tipoSangreController.text.isEmpty ? null : tipoSangreController.text,
+          correo: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+          telefono: telefonoController.text.trim().isEmpty ? null : telefonoController.text.trim(),
+          direccion: direccionController.text.trim().isEmpty ? null : direccionController.text.trim(),
+          nacionalidad: nacionalidadController.text.trim().isEmpty ? null : nacionalidadController.text.trim(),
+          ocupacion: ocupacionController.text.trim().isEmpty ? null : ocupacionController.text.trim(),
+          prevision: previsionController.text.trim().isEmpty ? null : previsionController.text.trim(),
+          tipoSangre: tipoSangreController.text.trim().isEmpty ? null : tipoSangreController.text.trim(),
         );
 
+        print('>>> Enviando actualización para paciente ID: ${paciente.idPaciente}');
+        print('>>> Sexo a enviar: $sexoSeleccionado');
+        
         await _pacientesService.actualizarPaciente(paciente.idPaciente!, pacienteActualizado);
         
         if (mounted) {
@@ -402,7 +401,10 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
           );
           _cargarPacientes(); // Recargar lista
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
+        print('>>> Error al actualizar paciente: $e');
+        print('>>> Stack trace: $stackTrace');
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -482,7 +484,7 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
                             children: [
                               Text('Sexo', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                               const SizedBox(height: 4),
-                              Chip(label: Text(paciente.sexo, style: const TextStyle(fontSize: 12))),
+                              Chip(label: Text(paciente.sexoDisplay, style: const TextStyle(fontSize: 12))),
                             ],
                           ),
                           Column(

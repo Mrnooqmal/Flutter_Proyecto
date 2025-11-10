@@ -13,7 +13,7 @@ app.use(express.json());
 const db = mysql.createConnection({
   host: '34.233.199.164', //ip_publica_ec2 , remplazar cada que cambie
   // para conectarse luego remotamente: mysql -h [ip_publica_ec2] -u meditrack_user2 -p , y luego password: M3d!Track2025
-  //"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -h 98.81.192.180 -u meditrack_user2 -p
+  //"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -h 34.233.199.164 -u meditrack_user2 -p
   user: 'meditrack_user',
   password: 'PasswordSeguro123!',
   database: 'MediTrack'
@@ -182,31 +182,57 @@ app.delete('/api/pacientes/:id', (req, res) => {
   });
 });
 
-// PUT /api/pacientes/:id - Actualizar paciente
+// PUT /api/pacientes/:id - Actualizar paciente (CORREGIDO)
 app.put('/api/pacientes/:id', (req, res) => {
   const { id } = req.params;
-  const { nombrePaciente, fechaNacimiento, correo, telefono, direccion, sexo, nacionalidad, ocupacion, prevision, tipoSangre } = req.body;
+  const {
+    nombrePaciente,
+    fechaNacimiento,
+    correo,
+    telefono,
+    direccion,
+    sexo,
+    nacionalidad,
+    ocupacion,
+    prevision,
+    tipoSangre
+  } = req.body;
 
-  const query = `
-  UPDATE Paciente
-  SET nombrePaciente = ?, fechaNacimiento = ?, correo = ?, telefono = ?,
-  direccion = ?, sexo = ?, nacionalidad = ?, ocupacion = ?,
-  prevision = ?, tipoSangre = ?
-  `;
+  console.log('>>> Actualizando paciente ID:', id);
+  console.log('>>> Correo recibido:', correo);
 
-  db.query(query, [nombrePaciente, fechaNacimiento, correo, telefono, direccion, sexo, nacionalidad, ocupacion, prevision, tipoSangre, id],
-    (err, results) => {
-      if (err) {
-        console.error('Error en MySQL:', err);
-        return res.status(500).json({ error: 'Error actualizando paciente' });
-      }
+  // Primero verificar si el paciente existe y obtener su correo actual
+  const checkQuery = 'SELECT correo FROM Paciente WHERE idPaciente = ?';
+  
+  db.query(checkQuery, [id], (checkErr, checkResults) => {
+    if (checkErr) {
+      console.error('Error verificando paciente:', checkErr);
+      return res.status(500).json({ error: 'Error verificando paciente', details: checkErr.message });
+    }
 
-      if (results.affectedRows === 0) {
-        return res.status(404).json({ error: 'Paciente no encontrado' });
-      }
+    if (checkResults.length === 0) {
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+    }
 
-      const pacienteActualizado = {
-        idPaciente: parseInt(id),
+    const pacienteActual = checkResults[0];
+    const correoActual = pacienteActual.correo;
+    
+    console.log('>>> Correo actual en BD:', correoActual);
+    console.log('>>> Correo nuevo recibido:', correo);
+
+    // Si el correo no cambió, hacer UPDATE normal
+    if (correo === correoActual || correo === null || correo === '') {
+      console.log('>>> Correo no cambió o es nulo, procediendo con UPDATE normal');
+      
+      const updateQuery = `
+        UPDATE Paciente 
+        SET nombrePaciente = ?, fechaNacimiento = ?, correo = ?, telefono = ?,
+        direccion = ?, sexo = ?, nacionalidad = ?, ocupacion = ?,
+        prevision = ?, tipoSangre = ?
+        WHERE idPaciente = ?
+      `;
+
+      const values = [
         nombrePaciente,
         fechaNacimiento,
         correo,
@@ -216,19 +242,115 @@ app.put('/api/pacientes/:id', (req, res) => {
         nacionalidad,
         ocupacion,
         prevision,
-        tipoSangre
-      };
+        tipoSangre,
+        id
+      ];
 
-      res.json(pacienteActualizado);
+      db.query(updateQuery, values, (updateErr, updateResult) => {
+        if (updateErr) {
+          console.error('Error en UPDATE:', updateErr);
+          return res.status(500).json({ error: 'Error actualizando paciente', details: updateErr.message });
+        }
+        
+        if (updateResult.affectedRows === 0) {
+          return res.status(404).json({ error: 'Paciente no encontrado' });
+        }
+        
+        const pacienteActualizado = {
+          idPaciente: parseInt(id),
+          nombrePaciente,
+          fechaNacimiento,
+          correo,
+          telefono,
+          direccion,
+          sexo,
+          nacionalidad,
+          ocupacion,
+          prevision,
+          tipoSangre
+        };
 
-      // notificar SSE
-      notificarClientes('paciente_actualizado', pacienteActualizado);
+        console.log('✅ Paciente actualizado exitosamente. ID:', id);
+        res.json(pacienteActualizado);
+
+        // notificar SSE
+        notificarClientes('paciente_actualizado', pacienteActualizado);
+      });
+    } else {
+      // Si el correo cambió, verificar que no exista en otro paciente
+      console.log('>>> Correo cambió, verificando duplicado...');
+      
+      const checkEmailQuery = 'SELECT idPaciente FROM Paciente WHERE correo = ? AND idPaciente != ?';
+      
+      db.query(checkEmailQuery, [correo, id], (emailErr, emailResults) => {
+        if (emailErr) {
+          console.error('Error verificando correo:', emailErr);
+          return res.status(500).json({ error: 'Error verificando correo', details: emailErr.message });
+        }
+
+        if (emailResults.length > 0) {
+          console.log('❌ Correo ya existe en otro paciente');
+          return res.status(400).json({ error: 'El correo electrónico ya está en uso por otro paciente' });
+        }
+
+        // Si el correo no existe en otro paciente, proceder con UPDATE
+        console.log('✅ Correo disponible, procediendo con UPDATE');
+        
+        const updateQuery = `
+          UPDATE Paciente 
+          SET nombrePaciente = ?, fechaNacimiento = ?, correo = ?, telefono = ?,
+          direccion = ?, sexo = ?, nacionalidad = ?, ocupacion = ?,
+          prevision = ?, tipoSangre = ?
+          WHERE idPaciente = ?
+        `;
+
+        const values = [
+          nombrePaciente,
+          fechaNacimiento,
+          correo,
+          telefono,
+          direccion,
+          sexo,
+          nacionalidad,
+          ocupacion,
+          prevision,
+          tipoSangre,
+          id
+        ];
+
+        db.query(updateQuery, values, (updateErr, updateResult) => {
+          if (updateErr) {
+            console.error('Error en UPDATE:', updateErr);
+            return res.status(500).json({ error: 'Error actualizando paciente', details: updateErr.message });
+          }
+          
+          if (updateResult.affectedRows === 0) {
+            return res.status(404).json({ error: 'Paciente no encontrado' });
+          }
+          
+          const pacienteActualizado = {
+            idPaciente: parseInt(id),
+            nombrePaciente,
+            fechaNacimiento,
+            correo,
+            telefono,
+            direccion,
+            sexo,
+            nacionalidad,
+            ocupacion,
+            prevision,
+            tipoSangre
+          };
+
+          console.log('Paciente actualizado exitosamente. ID:', id);
+          res.json(pacienteActualizado);
+
+          notificarClientes('paciente_actualizado', pacienteActualizado);
+        });
+      });
     }
-  );
+  });
 });
-
-
-// Iniciar servidor
 const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`API Server running on http://localhost:${PORT}`);
