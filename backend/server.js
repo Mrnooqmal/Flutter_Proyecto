@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 const db = mysql.createConnection({
-  host: '54.205.63.99', //ip_publica_ec2 , remplazar cada que cambie
+  host: '34.233.199.164', //ip_publica_ec2 , remplazar cada que cambie
   // para conectarse luego remotamente: mysql -h [ip_publica_ec2] -u meditrack_user2 -p , y luego password: M3d!Track2025
   //"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -h 98.81.192.180 -u meditrack_user2 -p
   user: 'meditrack_user',
