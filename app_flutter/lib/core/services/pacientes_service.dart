@@ -117,4 +117,57 @@ class PacientesService {
   Future<void> eliminarPaciente(int id) async {
     await _apiService.delete('/pacientes/$id');
   }
+
+  // GET /api/pacientes/:id/consultas - (obtener consultas de un paciente)
+  Future<List<Map<String, dynamic>>> getConsultasPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/consultas');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/pacientes/:id/signos-vitales - (obtener signos vitales)
+  Future<List<Map<String, dynamic>>> getSignosVitalesPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/signos-vitales');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/pacientes/:id/medicamentos-cronicos - (obtener medicamentos crónicos)
+  Future<List<Map<String, dynamic>>> getMedicamentosCronicosPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/medicamentos-cronicos');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/pacientes/:id/habitos - (obtener hábitos del paciente)
+  Future<List<Map<String, dynamic>>> getHabitosPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/habitos');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/pacientes/:id/alergias - (obtener alergias del paciente)
+  Future<List<Map<String, dynamic>>> getAlergiasPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/alergias');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/pacientes/:id/vacunas - (obtener vacunas del paciente)
+  Future<List<Map<String, dynamic>>> getVacunasPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/vacunas');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/pacientes/:id/examenes - (obtener exámenes del paciente)
+  Future<List<Map<String, dynamic>>> getExamenesPaciente(int id) async {
+    final response = await _apiService.get('/pacientes/$id/examenes');
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // GET /api/examenes/:idExamen/:idConsulta/archivo - (obtener archivo de examen)
+  Future<Map<String, dynamic>> getArchivoExamen(int idExamen, int idConsulta) async {
+    final response = await _apiService.get('/examenes/$idExamen/$idConsulta/archivo');
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  // GET /api/examenes/:idExamen/:idConsulta/download - (descargar archivo de examen)
+  String getDownloadUrlExamen(int idExamen, int idConsulta) {
+    return 'http://localhost:3001/api/examenes/$idExamen/$idConsulta/download';
+  }
 }

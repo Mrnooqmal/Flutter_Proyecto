@@ -18,6 +18,11 @@ dependencies:
   intl: ^0.20.2
   http: ^1.1.0
   flutter_http_sse: ^1.0.4
+  syncfusion_flutter_pdfviewer: ^28.1.33
+  photo_view: ^0.15.0
+  path_provider: ^2.1.5
+  open_file: ^3.5.9
+  file_picker: ^8.1.6
 
 dev_dependencies:
   flutter_test:
