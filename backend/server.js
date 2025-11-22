@@ -733,7 +733,10 @@ app.post('/api/examenes/upload', upload.single('archivo'), async (req, res) => {
   }
 });
 
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`API Server running on http://localhost:${PORT}`);
+const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 para EC2, localhost funciona también local
+
+app.listen(PORT, HOST, () => {
+  console.log(`API Server running on http://${HOST}:${PORT}`);
+  console.log(`Modo: ${HOST === '0.0.0.0' ? 'Producción (acepta conexiones remotas)' : 'Local'}`);
 });
