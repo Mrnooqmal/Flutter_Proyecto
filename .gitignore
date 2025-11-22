@@ -11,6 +11,10 @@
 .vscode/
 .github/
 
+# Node.js
+node_modules/
+package-lock.json
+
 # IntelliJ related
 *.iml
 *.ipr
