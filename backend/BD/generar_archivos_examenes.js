@@ -55,10 +55,6 @@ function generarPDFExamen(nombreExamen, tipoExamen, valorReferencia) {
       doc.moveDown(0.5);
     });
 
-    // Footer
-    doc.moveDown(3);
-    doc.fontSize(8).text('_'.repeat(80));
-    doc.text('Documento generado automáticamente - Solo para fines de demostración', { align: 'center', color: 'gray' });
 
     doc.end();
   });

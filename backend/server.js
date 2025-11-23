@@ -733,6 +733,213 @@ app.post('/api/examenes/upload', upload.single('archivo'), async (req, res) => {
   }
 });
 
+// ====================================
+// DASHBOARD ENDPOINTS
+// ====================================
+
+// GET /api/dashboard/stats - Estadísticas principales
+app.get('/api/dashboard/stats', (req, res) => {
+  const queries = {
+    totalPacientes: 'SELECT COUNT(*) as total FROM Paciente',
+    consultasHoy: `SELECT COUNT(*) as total FROM Consulta WHERE fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`,
+    pacientesCriticos: `
+      SELECT COUNT(DISTINCT dc.idPaciente) as total
+      FROM DetalleConsulta dc
+      JOIN Consulta c ON dc.idConsulta = c.idConsulta
+      WHERE c.fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        AND (
+          (dc.idDatoClinico = 2 AND (dc.temperatura < 36 OR dc.temperatura > 38))
+          OR (dc.idDatoClinico = 5 AND dc.glucosa > 140)
+        )
+    `,
+    examenesPendientes: `
+      SELECT COUNT(*) as total 
+      FROM ConsultaExamen ce
+      JOIN Consulta c ON ce.idConsulta = c.idConsulta
+      WHERE c.fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    `
+  };
+
+  const stats = {};
+  let completedQueries = 0;
+  const totalQueries = Object.keys(queries).length;
+
+  Object.keys(queries).forEach(key => {
+    db.query(queries[key], (err, results) => {
+      if (err) {
+        console.error(`Error en query ${key}:`, err);
+        stats[key] = 0;
+      } else {
+        stats[key] = results[0].total;
+      }
+      
+      completedQueries++;
+      if (completedQueries === totalQueries) {
+        res.json(stats);
+      }
+    });
+  });
+});
+
+// GET /api/dashboard/consultas-por-dia - Consultas de los últimos 30 días
+app.get('/api/dashboard/consultas-por-dia', (req, res) => {
+  const dias = req.query.dias || 30;
+  
+  const query = `
+    SELECT 
+      DATE(fechaIngreso) as fecha,
+      COUNT(*) as cantidad
+    FROM Consulta
+    WHERE fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+    GROUP BY DATE(fechaIngreso)
+    ORDER BY fecha ASC
+  `;
+  
+  db.query(query, [dias], (err, results) => {
+    if (err) {
+      console.error('Error obteniendo consultas por día:', err);
+      return res.status(500).json({ error: 'Error obteniendo datos' });
+    }
+    res.json(results);
+  });
+});
+
+// GET /api/dashboard/pacientes-por-edad - Distribución de pacientes por rango etario
+app.get('/api/dashboard/pacientes-por-edad', (req, res) => {
+  const query = `
+    SELECT 
+      CASE 
+        WHEN TIMESTAMPDIFF(YEAR, fechaNacimiento, CURDATE()) < 18 THEN '0-17'
+        WHEN TIMESTAMPDIFF(YEAR, fechaNacimiento, CURDATE()) BETWEEN 18 AND 40 THEN '18-40'
+        WHEN TIMESTAMPDIFF(YEAR, fechaNacimiento, CURDATE()) BETWEEN 41 AND 65 THEN '41-65'
+        ELSE '65+'
+      END as rangoEdad,
+      COUNT(*) as cantidad
+    FROM Paciente
+    GROUP BY rangoEdad
+    ORDER BY rangoEdad
+  `;
+  
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error obteniendo distribución por edad:', err);
+      return res.status(500).json({ error: 'Error obteniendo datos' });
+    }
+    res.json(results);
+  });
+});
+
+// GET /api/dashboard/top-examenes - Top 5 exámenes más solicitados
+app.get('/api/dashboard/top-examenes', (req, res) => {
+  const query = `
+    SELECT 
+      e.nombreExamen as examen,
+      COUNT(*) as cantidad
+    FROM ConsultaExamen ce
+    INNER JOIN Examen e ON ce.idExamen = e.idExamen
+    GROUP BY e.idExamen, e.nombreExamen
+    ORDER BY cantidad DESC
+    LIMIT 5
+  `;
+  
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error obteniendo top exámenes:', err);
+      return res.status(500).json({ error: 'Error obteniendo datos' });
+    }
+    res.json(results);
+  });
+});
+
+// GET /api/dashboard/top-medicamentos - Top 5 medicamentos más recetados
+app.get('/api/dashboard/top-medicamentos', (req, res) => {
+  const query = `
+    SELECT 
+      m.nombreMedicamento as medicamento,
+      COUNT(*) as cantidad
+    FROM MedicamentoCronicoPaciente mc
+    INNER JOIN Medicamento m ON mc.idMedicamento = m.idMedicamento
+    GROUP BY m.idMedicamento, m.nombreMedicamento
+    ORDER BY cantidad DESC
+    LIMIT 5
+  `;
+  
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error obteniendo top medicamentos:', err);
+      return res.status(500).json({ error: 'Error obteniendo datos' });
+    }
+    res.json(results);
+  });
+});
+
+// GET /api/dashboard/ultimas-consultas - Últimas 5 consultas registradas
+app.get('/api/dashboard/ultimas-consultas', (req, res) => {
+  const query = `
+    SELECT 
+      c.idConsulta,
+      c.fechaIngreso,
+      c.motivo,
+      p.nombrePaciente,
+      p.idPaciente
+    FROM Consulta c
+    INNER JOIN Paciente p ON c.idPaciente = p.idPaciente
+    ORDER BY c.fechaIngreso DESC
+    LIMIT 5
+  `;
+  
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error obteniendo últimas consultas:', err);
+      return res.status(500).json({ error: 'Error obteniendo datos' });
+    }
+    res.json(results);
+  });
+});
+
+// GET /api/dashboard/alertas-signos-vitales - Pacientes con signos vitales anormales
+app.get('/api/dashboard/alertas-signos-vitales', (req, res) => {
+  const query = `
+    SELECT 
+      p.idPaciente,
+      p.nombrePaciente,
+      MAX(CASE WHEN dc.idDatoClinico = 1 THEN dc.valor END) as presionArterial,
+      MAX(CASE WHEN dc.idDatoClinico = 2 THEN dc.valor END) as temperatura,
+      MAX(CASE WHEN dc.idDatoClinico = 3 THEN dc.valor END) as peso,
+      MAX(CASE WHEN dc.idDatoClinico = 5 THEN dc.valor END) as glucosa,
+      dc.fechaRegistro as fechaMedicion,
+      CASE
+        WHEN MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 38 THEN 'Fiebre'
+        WHEN MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 35 THEN 'Hipotermia'
+        WHEN MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 200 THEN 'Glucosa alta'
+        WHEN MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 70 THEN 'Glucosa baja'
+        ELSE 'Otro'
+      END as alerta
+    FROM DetalleConsulta dc
+    INNER JOIN Consulta c ON dc.idConsulta = c.idConsulta
+    INNER JOIN Paciente p ON c.idPaciente = p.idPaciente
+    WHERE dc.fechaRegistro >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    AND dc.idDatoClinico IN (1, 2, 3, 5)
+    GROUP BY p.idPaciente, p.nombrePaciente, dc.fechaRegistro
+    HAVING (
+      MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 38 OR
+      MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 35 OR
+      MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 200 OR
+      MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 70
+    )
+    ORDER BY dc.fechaRegistro DESC
+    LIMIT 10
+  `;
+  
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error obteniendo alertas de signos vitales:', err);
+      return res.status(500).json({ error: 'Error obteniendo datos' });
+    }
+    res.json(results);
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 para EC2, localhost funciona también local
 

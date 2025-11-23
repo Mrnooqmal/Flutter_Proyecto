@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_flutter/pages/profile_page.dart';
-import 'package:app_flutter/pages/medical_followup_page.dart';
+import 'package:app_flutter/pages/dashboard_page.dart';
 import 'package:app_flutter/pages/lista_pacientes_page.dart';
 import 'package:app_flutter/pages/ficha_medica_detalle_page.dart';
 import 'package:app_flutter/core/services/pacientes_service.dart';
@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const MyHomePage(title: 'MediTrack - Inicio'),
         '/profile': (context) => const ProfilePage(),
-        '/followup': (context) => const MedicalFollowupPage(),
+        '/dashboard': (context) => const DashboardPage(),
         '/lista-pacientes': (context) => const ListaPacientesPage(),
       },
       onGenerateRoute: (settings) {
@@ -314,10 +314,10 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(width: 12),
         Expanded(
           child: _buildQuickAccessCard(
-            'Seguimiento',
-            Icons.monitor_heart,
+            'Dashboard',
+            Icons.dashboard,
             Colors.red,
-            () => Navigator.of(context).pushNamed('/followup'),
+            () => Navigator.of(context).pushNamed('/dashboard'),
           ),
         ),
       ],
@@ -383,11 +383,11 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
         const SizedBox(height: 12),
         _buildActionButton(
-          'Seguimiento Médico',
-          'Consultar historial y seguimiento de pacientes',
-          Icons.monitor_heart,
+          'Dashboard Médico',
+          'Estadísticas, gráficos y alertas del sistema',
+          Icons.dashboard,
           Colors.red,
-          () => Navigator.of(context).pushNamed('/followup'),
+          () => Navigator.of(context).pushNamed('/dashboard'),
         ),
       ],
     );
