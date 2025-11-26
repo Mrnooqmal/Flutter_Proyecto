@@ -5,25 +5,25 @@ import 'api_service.dart';
 class DashboardService {
   final ApiService _apiService = ApiService();
 
-  // GET /api/dashboard/stats - Estadísticas principales
+  // GET /api/dashboard/stats - estadisticas principales
   Future<Map<String, dynamic>> getEstadisticas() async {
     final response = await _apiService.get('/dashboard/stats');
     return Map<String, dynamic>.from(response.data);
   }
 
-  // GET /api/dashboard/consultas-por-dia - Consultas por día
+  // GET /api/dashboard/consultas-por-dia - consultas por dia
   Future<List<Map<String, dynamic>>> getConsultasPorDia({int dias = 30}) async {
     final response = await _apiService.get('/dashboard/consultas-por-dia?dias=$dias');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // GET /api/dashboard/pacientes-por-edad - Distribución por edad
+  // GET /api/dashboard/pacientes-por-edad - distribucion por edad
   Future<List<Map<String, dynamic>>> getPacientesPorEdad() async {
     final response = await _apiService.get('/dashboard/pacientes-por-edad');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // GET /api/dashboard/top-examenes - Top 5 exámenes
+  // GET /api/dashboard/top-examenes - top 5 examenes
   Future<List<Map<String, dynamic>>> getTopExamenes() async {
     final response = await _apiService.get('/dashboard/top-examenes');
     return List<Map<String, dynamic>>.from(response.data);
@@ -35,7 +35,7 @@ class DashboardService {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // GET /api/dashboard/ultimas-consultas - Últimas 5 consultas
+  // GET /api/dashboard/ultimas-consultas - ultimas 5 consultas
   Future<List<Map<String, dynamic>>> getUltimasConsultas() async {
     final response = await _apiService.get('/dashboard/ultimas-consultas');
     return List<Map<String, dynamic>>.from(response.data);

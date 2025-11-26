@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
         '/lista-pacientes': (context) => const ListaPacientesPage(),
       },
       onGenerateRoute: (settings) {
-        // Ruta dinámica para ficha médica detallada
+        // ruta dinamica para ficha medica detallada
         if (settings.name?.startsWith('/ficha-medica/') ?? false) {
           final idPaciente = int.tryParse(settings.name!.split('/').last);
           if (idPaciente != null) {
@@ -127,7 +127,7 @@ class _MyHomePageState extends State<MyHomePage> {
               _buildHeader(),
               const SizedBox(height: 24),
 
-              // Estadísticas rápidas
+              // estadisticas rapidas
               const Text(
                 'Resumen General',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),

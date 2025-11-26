@@ -81,12 +81,12 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isLoading = true);
 
     try {
-      // Parsear fecha de DD/MM/YYYY a DateTime
+      // parsear fecha de DD/MM/YYYY a DateTime
       final partes = _fechaNacimiento.text.split('/');
       final fechaNac = DateTime(
-        int.parse(partes[2]), // año
+        int.parse(partes[2]), // anio
         int.parse(partes[1]), // mes
-        int.parse(partes[0]), // día
+        int.parse(partes[0]), // dia
       );
 
       // Crear objeto Paciente
@@ -270,7 +270,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Teléfono
+                        // telefono
                         TextFormField(
                           controller: _telefono,
                           decoration: const InputDecoration(
@@ -282,7 +282,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Dirección
+                        // direccion
                         TextFormField(
                           controller: _direccion,
                           decoration: const InputDecoration(
@@ -305,7 +305,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Ocupación
+                        // ocupacion
                         TextFormField(
                           controller: _ocupacion,
                           decoration: const InputDecoration(
@@ -316,7 +316,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Previsión
+                        // prevision
                         TextFormField(
                           controller: _prevision,
                           decoration: const InputDecoration(

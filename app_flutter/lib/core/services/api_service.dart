@@ -16,7 +16,7 @@ class ApiService {
       },
     ));
 
-    // interceptor para logging
+    // log de requests
     _dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,

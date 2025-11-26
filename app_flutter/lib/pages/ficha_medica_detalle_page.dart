@@ -50,10 +50,10 @@ class _FichaMedicaDetallePageState extends State<FichaMedicaDetallePage> {
       // Cargar signos vitales
       final signosVitales = await _pacientesService.getSignosVitalesPaciente(widget.idPaciente);
       
-      // Cargar medicamentos crónicos
+      // cargar medicamentos cronicos
       final medicamentos = await _pacientesService.getMedicamentosCronicosPaciente(widget.idPaciente);
 
-      // Cargar hábitos
+      // cargar habitos
       final habitos = await _pacientesService.getHabitosPaciente(widget.idPaciente);
       
       // Cargar alergias
@@ -62,7 +62,7 @@ class _FichaMedicaDetallePageState extends State<FichaMedicaDetallePage> {
       // Cargar vacunas
       final vacunas = await _pacientesService.getVacunasPaciente(widget.idPaciente);
       
-      // Cargar exámenes
+      // cargar examenes
       final examenes = await _pacientesService.getExamenesPaciente(widget.idPaciente);
 
       setState(() {
@@ -106,7 +106,7 @@ class _FichaMedicaDetallePageState extends State<FichaMedicaDetallePage> {
                 ),
               );
               
-              // Si se subió exitosamente, recargar datos
+              // si se subio exitosamente recargar datos
               if (resultado == true) {
                 _cargarPaciente();
               }
@@ -766,7 +766,7 @@ class _FichaMedicaDetallePageState extends State<FichaMedicaDetallePage> {
                         style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                       ),
                     ),
-                  // Botones de acción si tiene archivo
+                  // botones de accion si tiene archivo
                   if (examen['archivoNombre'] != null) ...[
                     const SizedBox(height: 8),
                     Row(

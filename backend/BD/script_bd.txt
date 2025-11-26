@@ -1,0 +1,328 @@
+-- ============================================
+-- SCRIPT DE CREACIÓN BASE DE DATOS FICHAS MÉDICAS
+-- Motor: MySQL 8.x
+-- ============================================
+
+CREATE DATABASE IF NOT EXISTS MediTrack;
+USE MediTrack;
+
+-- ======================
+-- TABLAS BASE
+-- ======================
+
+CREATE TABLE Paciente (
+    idPaciente INT AUTO_INCREMENT PRIMARY KEY,
+    nombrePaciente VARCHAR(100) NOT NULL,
+    fechaNacimiento DATE NOT NULL,
+    correo VARCHAR(100) UNIQUE,
+    telefono VARCHAR(30),
+    direccion VARCHAR(150),
+    sexo ENUM('masculino', 'femenino', 'otro') NOT NULL,
+    nacionalidad VARCHAR(50),
+    ocupacion VARCHAR(100),
+    prevision VARCHAR(50),
+    tipoSangre VARCHAR(5),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Habito (
+    idHabito INT AUTO_INCREMENT PRIMARY KEY,
+    habito VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE HabitoPaciente (
+    idHabito INT,
+    idPaciente INT,
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idHabito, idPaciente),
+    FOREIGN KEY (idHabito) REFERENCES Habito(idHabito),
+    FOREIGN KEY (idPaciente) REFERENCES Paciente(idPaciente) ON DELETE CASCADE
+);
+
+CREATE TABLE Alergia (
+    idAlergia INT AUTO_INCREMENT PRIMARY KEY,
+    alergia VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE AlergiaPaciente (
+    idPaciente INT,
+    idAlergia INT,
+    observacion VARCHAR(200),
+    fechaRegistro DATE NOT NULL DEFAULT (CURRENT_DATE),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idPaciente, idAlergia),
+    FOREIGN KEY (idPaciente) REFERENCES Paciente(idPaciente) ON DELETE CASCADE,
+    FOREIGN KEY (idAlergia) REFERENCES Alergia(idAlergia)
+);
+
+CREATE TABLE Vacuna (
+    idVacuna INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE PacienteVacuna (
+    idPaciente INT,
+    idVacuna INT,
+    fecha DATE NOT NULL DEFAULT (CURRENT_DATE),
+    dosis VARCHAR(50),
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idPaciente, idVacuna),
+    FOREIGN KEY (idPaciente) REFERENCES Paciente(idPaciente) ON DELETE CASCADE,
+    FOREIGN KEY (idVacuna) REFERENCES Vacuna(idVacuna)
+);
+
+CREATE TABLE Medicamento (
+    idMedicamento INT AUTO_INCREMENT PRIMARY KEY,
+    nombreMedicamento VARCHAR(100) NOT NULL,
+    empresa VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE MedicamentoCronicoPaciente (
+    idPaciente INT,
+    idMedicamento INT,
+    fechaInicio DATE DEFAULT (CURRENT_DATE),
+    fechaFin DATE,
+    cronico BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idPaciente, idMedicamento),
+    FOREIGN KEY (idPaciente) REFERENCES Paciente(idPaciente) ON DELETE CASCADE,
+    FOREIGN KEY (idMedicamento) REFERENCES Medicamento(idMedicamento)
+);
+
+CREATE TABLE TipoConsulta (
+    idTipoConsulta INT AUTO_INCREMENT PRIMARY KEY,
+    nombreTipoConsulta VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ServicioSalud (
+    idServicioSalud INT AUTO_INCREMENT PRIMARY KEY,
+    nombreServicioSalud VARCHAR(100) NOT NULL,
+    direccion VARCHAR(150),
+    idTipoServicioSalud INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (idTipoServicioSalud) REFERENCES TipoConsulta(idTipoConsulta)
+);
+
+CREATE TABLE ProfesionalSalud (
+    idProfesionalSalud INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    especialidad VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Consulta (
+    idConsulta INT AUTO_INCREMENT PRIMARY KEY,
+    idPaciente INT NOT NULL,
+    idServicioSalud INT,
+    idProfesionalSalud INT,
+    idTipoConsulta INT,
+    fechaIngreso DATE DEFAULT (CURRENT_DATE),
+    fechaEgreso DATE,
+    condicionEgreso VARCHAR(100),
+    hora TIME DEFAULT (CURRENT_TIME),
+    motivo VARCHAR(200),
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (idPaciente) REFERENCES Paciente(idPaciente) ON DELETE CASCADE,
+    FOREIGN KEY (idServicioSalud) REFERENCES ServicioSalud(idServicioSalud),
+    FOREIGN KEY (idProfesionalSalud) REFERENCES ProfesionalSalud(idProfesionalSalud),
+    FOREIGN KEY (idTipoConsulta) REFERENCES TipoConsulta(idTipoConsulta)
+);
+
+
+CREATE TABLE Receta (
+    idConsulta INT,
+    idMedicamento INT,
+    frecuencia VARCHAR(100),
+    dosis VARCHAR(100),
+    fecha DATE DEFAULT (CURRENT_DATE),
+    duracion VARCHAR(50),
+    cronico BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idConsulta, idMedicamento),
+    FOREIGN KEY (idConsulta) REFERENCES Consulta(idConsulta) ON DELETE CASCADE,
+    FOREIGN KEY (idMedicamento) REFERENCES Medicamento(idMedicamento)
+);
+
+CREATE TABLE Examen (
+    idExamen INT AUTO_INCREMENT PRIMARY KEY,
+    nombreExamen VARCHAR(100) NOT NULL,
+    tipoExamen VARCHAR(50),
+    unidadMedida VARCHAR(30),
+    valorReferencia VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ConsultaExamen (
+    idExamen INT,
+    idConsulta INT,
+    fecha DATE DEFAULT (CURRENT_DATE),
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idExamen, idConsulta),
+    FOREIGN KEY (idExamen) REFERENCES Examen(idExamen),
+    FOREIGN KEY (idConsulta) REFERENCES Consulta(idConsulta) ON DELETE CASCADE
+);
+
+CREATE TABLE Evolucion (
+    idEvolucion INT AUTO_INCREMENT PRIMARY KEY,
+    idConsulta INT,
+    fecha DATE NOT NULL DEFAULT (CURRENT_DATE),
+    descripcion TEXT,
+    proximaCita DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (idConsulta) REFERENCES Consulta(idConsulta) ON DELETE CASCADE
+);
+
+CREATE TABLE TipoProcedimiento (
+    idTipoProcedimiento INT AUTO_INCREMENT PRIMARY KEY,
+    tipoProcedimiento VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Procedimiento (
+    idProcedimiento INT AUTO_INCREMENT PRIMARY KEY,
+    nombreProcedimiento VARCHAR(100) NOT NULL,
+    fecha DATE DEFAULT (CURRENT_DATE),
+    idTipoProcedimiento INT,
+    indicaciones VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (idTipoProcedimiento) REFERENCES TipoProcedimiento(idTipoProcedimiento)
+);
+
+CREATE TABLE ConsultaProcedimiento (
+    idConsulta INT,
+    idProcedimiento INT,
+    fecha DATE DEFAULT (CURRENT_DATE),
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idConsulta, idProcedimiento),
+    FOREIGN KEY (idConsulta) REFERENCES Consulta(idConsulta) ON DELETE CASCADE,
+    FOREIGN KEY (idProcedimiento) REFERENCES Procedimiento(idProcedimiento)
+);
+
+CREATE TABLE DatoClinico (
+    idDatoClinico INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100),
+    unidadMedida VARCHAR(30),
+    descripcion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE DetalleConsulta (
+    idConsulta INT,
+    idDatoClinico INT,
+    valor VARCHAR(100),
+    fechaRegistro DATE DEFAULT (CURRENT_DATE),
+    observacion VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idConsulta, idDatoClinico),
+    FOREIGN KEY (idConsulta) REFERENCES Consulta(idConsulta) ON DELETE CASCADE,
+    FOREIGN KEY (idDatoClinico) REFERENCES DatoClinico(idDatoClinico)
+);
+
+CREATE TABLE Diagnostico (
+    idDiagnostico INT AUTO_INCREMENT PRIMARY KEY,
+    urgencia BOOLEAN DEFAULT false,
+    cie10 VARCHAR(10),
+    comentarios VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ConsultaDiagnostico (
+    idConsulta INT,
+    idDiagnostico INT,
+    observacion VARCHAR(200),
+    urgencia BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (idConsulta, idDiagnostico),
+    FOREIGN KEY (idConsulta) REFERENCES Consulta(idConsulta) ON DELETE CASCADE,
+    FOREIGN KEY (idDiagnostico) REFERENCES Diagnostico(idDiagnostico)
+);
+
+-- ======================
+-- ÍNDICES ADICIONALES
+-- ======================
+CREATE INDEX idx_paciente_correo ON Paciente(correo);
+CREATE INDEX idx_paciente_nombre ON Paciente(nombrePaciente);
+CREATE INDEX idx_consulta_fecha ON Consulta(fechaIngreso);
+CREATE INDEX idx_consulta_paciente ON Consulta(idPaciente);
+CREATE INDEX idx_receta_fecha ON Receta(fecha);
+CREATE INDEX idx_examen_nombre ON Examen(nombreExamen);
+CREATE INDEX idx_medicamento_nombre ON Medicamento(nombreMedicamento);
+CREATE INDEX idx_evolucion_fecha ON Evolucion(fecha);
+CREATE INDEX idx_alergia_paciente ON AlergiaPaciente(idPaciente);
+CREATE INDEX idx_vacuna_paciente ON PacienteVacuna(idPaciente);
+
+
+
+
+-- ======================
+-- DATOS INICIALES DE PRUEBA
+-- ======================
+
+-- Insertar hábitos comunes
+INSERT INTO Habito (habito) VALUES 
+('Tabaco'), ('Alcohol'), ('Ejercicio regular'), ('Dieta balanceada'), 
+('Cafeína'), ('Drogas recreativas'), ('Meditación'), ('Sueno regular');
+
+-- Insertar alergias comunes
+INSERT INTO Alergia (alergia) VALUES 
+('Penicilina'), ('Aspirina'), ('Mariscos'), ('Maní'), ('Látex'), 
+('Polvo'), ('Polen'), ('Acaros'), ('Huevos'), ('Lactosa');
+
+-- Insertar vacunas comunes
+INSERT INTO Vacuna (nombre, observacion) VALUES 
+('Influenza', 'Vacuna anual contra la influenza'),
+('COVID-19', 'Vacuna contra COVID-19'),
+('Hepatitis B', 'Vacuna contra hepatitis B'),
+('Tétanos', 'Refuerzo cada 10 años'),
+('MMR', 'Sarampión, paperas, rubéola');
+
+-- Insertar tipos de consulta
+INSERT INTO TipoConsulta (nombreTipoConsulta) VALUES 
+('Consulta general'), ('Control rutinario'), ('Urgencia'), 
+('Especialidad'), ('Exámenes'), ('Procedimiento');
+
+-- Insertar medicamentos comunes
+INSERT INTO Medicamento (nombreMedicamento, empresa) VALUES 
+('Paracetamol', 'Genérico'), ('Ibuprofeno', 'Genérico'),
+('Amoxicilina', 'Pfizer'), ('Loratadina', 'Bayer'),
+('Omeprazol', 'AstraZeneca'), ('Metformina', 'Merck');
+
+-- Insertar tipos de procedimiento
+INSERT INTO TipoProcedimiento (tipoProcedimiento) VALUES 
+('Cirugía'), ('Biopsia'), ('Endoscopía'), 
+('Radiografía'), ('Ecografía'), ('Tomografía');
+
+-- Insertar datos clínicos comunes
+INSERT INTO DatoClinico (nombre, unidadMedida, descripcion) VALUES 
+('Presión arterial', 'mmHg', 'Presión arterial sistólica/diastólica'),
+('Temperatura', '°C', 'Temperatura corporal'),
+('Peso', 'kg', 'Peso corporal'),
+('Estatura', 'cm', 'Estatura'),
+('Glucosa', 'mg/dL', 'Nivel de glucosa en sangre'),
+('Colesterol total', 'mg/dL', 'Colesterol total');
+
+-- ======================
+-- VERIFICACIÓN
+-- ======================
+
+SELECT 'Base de datos MediTrack creada exitosamente!' as Status;
+
+-- Mostrar todas las tablas creadas
+SHOW TABLES;
+
+-- Contar tablas creadas
+SELECT COUNT(*) as Total_Tablas FROM information_schema.tables 
+WHERE table_schema = 'MediTrack';

@@ -15,10 +15,10 @@ app.use(express.json());
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 16 * 1024 * 1024, // 16MB máximo
+    fileSize: 16 * 1024 * 1024, // 16MB maximo
   },
   fileFilter: (req, file, cb) => {
-    // Aceptar solo PDFs e imágenes
+    // aceptar solo PDFs e imagenes
     if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -237,9 +237,9 @@ app.put('/api/pacientes/:id', (req, res) => {
     console.log('>>> Correo actual en BD:', correoActual);
     console.log('>>> Correo nuevo recibido:', correo);
 
-    // Si el correo no cambió, hacer UPDATE normal
+    // si el correo no cambio, hacer UPDATE normal
     if (correo === correoActual || correo === null || correo === '') {
-      console.log('>>> Correo no cambió o es nulo, procediendo con UPDATE normal');
+      console.log('>>> Correo no cambio o es nulo, procediendo con UPDATE normal');
       
       const updateQuery = `
         UPDATE Paciente 
@@ -294,8 +294,8 @@ app.put('/api/pacientes/:id', (req, res) => {
         notificarClientes('paciente_actualizado', pacienteActualizado);
       });
     } else {
-      // Si el correo cambió, verificar que no exista en otro paciente
-      console.log('>>> Correo cambió, verificando duplicado...');
+      // si el correo cambio, verificar que no exista en otro paciente
+      console.log('>>> Correo cambio, verificando duplicado...');
       
       const checkEmailQuery = 'SELECT idPaciente FROM Paciente WHERE correo = ? AND idPaciente != ?';
       
@@ -370,7 +370,7 @@ app.put('/api/pacientes/:id', (req, res) => {
 });
 
 // ====================================
-// ENDPOINTS PARA FICHA MÉDICA DETALLADA
+// ENDPOINTS PARA FICHA MEDICA DETALLADA
 // ====================================
 
 // GET /api/pacientes/:id/consultas - Obtener consultas de un paciente
@@ -435,7 +435,7 @@ app.get('/api/pacientes/:id/signos-vitales', (req, res) => {
   });
 });
 
-// GET /api/pacientes/:id/medicamentos-cronicos - Obtener medicamentos crónicos de un paciente
+// GET /api/pacientes/:id/medicamentos-cronicos - obtener medicamentos cronicos de un paciente
 app.get('/api/pacientes/:id/medicamentos-cronicos', (req, res) => {
   const { id } = req.params;
   
@@ -455,14 +455,14 @@ app.get('/api/pacientes/:id/medicamentos-cronicos', (req, res) => {
   
   db.query(query, [id], (err, results) => {
     if (err) {
-      console.error('Error obteniendo medicamentos crónicos:', err);
+      console.error('Error obteniendo medicamentos cronicos:', err);
       return res.status(500).json({ error: 'Error del servidor' });
     }
     res.json(results);
   });
 });
 
-// GET /api/pacientes/:id/habitos - Obtener hábitos de un paciente
+// GET /api/pacientes/:id/habitos - obtener habitos de un paciente
 app.get('/api/pacientes/:id/habitos', (req, res) => {
   const { id } = req.params;
   
@@ -538,7 +538,7 @@ app.get('/api/pacientes/:id/vacunas', (req, res) => {
   });
 });
 
-// GET /api/pacientes/:id/examenes - Obtener exámenes de un paciente
+// GET /api/pacientes/:id/examenes - obtener examenes de un paciente
 app.get('/api/pacientes/:id/examenes', (req, res) => {
   const { id } = req.params;
   
@@ -664,7 +664,7 @@ app.post('/api/examenes/upload', upload.single('archivo'), async (req, res) => {
       return res.status(400).json({ error: 'idPaciente e idExamen son requeridos' });
     }
 
-    // Buscar última consulta del paciente o crear una nueva
+    // buscar ultima consulta del paciente o crear una nueva
     db.query(
       'SELECT idConsulta FROM Consulta WHERE idPaciente = ? ORDER BY fechaIngreso DESC LIMIT 1',
       [idPaciente],
@@ -737,7 +737,7 @@ app.post('/api/examenes/upload', upload.single('archivo'), async (req, res) => {
 // DASHBOARD ENDPOINTS
 // ====================================
 
-// GET /api/dashboard/stats - Estadísticas principales
+// GET /api/dashboard/stats - estadisticas principales
 app.get('/api/dashboard/stats', (req, res) => {
   const queries = {
     totalPacientes: 'SELECT COUNT(*) as total FROM Paciente',
@@ -781,7 +781,7 @@ app.get('/api/dashboard/stats', (req, res) => {
   });
 });
 
-// GET /api/dashboard/consultas-por-dia - Consultas de los últimos 30 días
+// GET /api/dashboard/consultas-por-dia - consultas de los ultimos 30 dias
 app.get('/api/dashboard/consultas-por-dia', (req, res) => {
   const dias = req.query.dias || 30;
   
@@ -797,14 +797,14 @@ app.get('/api/dashboard/consultas-por-dia', (req, res) => {
   
   db.query(query, [dias], (err, results) => {
     if (err) {
-      console.error('Error obteniendo consultas por día:', err);
+      console.error('Error obteniendo consultas por dia:', err);
       return res.status(500).json({ error: 'Error obteniendo datos' });
     }
     res.json(results);
   });
 });
 
-// GET /api/dashboard/pacientes-por-edad - Distribución de pacientes por rango etario
+// GET /api/dashboard/pacientes-por-edad - distribucion de pacientes por rango etario
 app.get('/api/dashboard/pacientes-por-edad', (req, res) => {
   const query = `
     SELECT 
@@ -822,14 +822,14 @@ app.get('/api/dashboard/pacientes-por-edad', (req, res) => {
   
   db.query(query, (err, results) => {
     if (err) {
-      console.error('Error obteniendo distribución por edad:', err);
+      console.error('Error obteniendo distribucion por edad:', err);
       return res.status(500).json({ error: 'Error obteniendo datos' });
     }
     res.json(results);
   });
 });
 
-// GET /api/dashboard/top-examenes - Top 5 exámenes más solicitados
+// GET /api/dashboard/top-examenes - top 5 examenes mas solicitados
 app.get('/api/dashboard/top-examenes', (req, res) => {
   const query = `
     SELECT 
@@ -844,14 +844,14 @@ app.get('/api/dashboard/top-examenes', (req, res) => {
   
   db.query(query, (err, results) => {
     if (err) {
-      console.error('Error obteniendo top exámenes:', err);
+      console.error('Error obteniendo top examenes:', err);
       return res.status(500).json({ error: 'Error obteniendo datos' });
     }
     res.json(results);
   });
 });
 
-// GET /api/dashboard/top-medicamentos - Top 5 medicamentos más recetados
+// GET /api/dashboard/top-medicamentos - top 5 medicamentos mas recetados
 app.get('/api/dashboard/top-medicamentos', (req, res) => {
   const query = `
     SELECT 
@@ -873,7 +873,7 @@ app.get('/api/dashboard/top-medicamentos', (req, res) => {
   });
 });
 
-// GET /api/dashboard/ultimas-consultas - Últimas 5 consultas registradas
+// GET /api/dashboard/ultimas-consultas - ultimas 5 consultas registradas
 app.get('/api/dashboard/ultimas-consultas', (req, res) => {
   const query = `
     SELECT 
@@ -941,9 +941,9 @@ app.get('/api/dashboard/alertas-signos-vitales', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 para EC2, localhost funciona también local
+const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 para EC2, localhost funciona tambien local
 
 app.listen(PORT, HOST, () => {
   console.log(`API Server running on http://${HOST}:${PORT}`);
-  console.log(`Modo: ${HOST === '0.0.0.0' ? 'Producción (acepta conexiones remotas)' : 'Local'}`);
+  console.log(`Modo: ${HOST === '0.0.0.0' ? 'Produccion (acepta conexiones remotas)' : 'Local'}`);
 });

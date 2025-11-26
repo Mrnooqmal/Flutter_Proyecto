@@ -92,7 +92,7 @@ class _ArchivoExamenViewerState extends State<ArchivoExamenViewer> {
 
       if (!mounted) return;
 
-      // Mostrar confirmación y opción de abrir
+      // mostrar confirmacion y opcion de abrir
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Archivo guardado en: $filePath'),

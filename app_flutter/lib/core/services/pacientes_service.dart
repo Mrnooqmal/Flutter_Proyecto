@@ -130,13 +130,13 @@ class PacientesService {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // GET /api/pacientes/:id/medicamentos-cronicos - (obtener medicamentos crónicos)
+  // GET /api/pacientes/:id/medicamentos-cronicos - obtener medicamentos cronicos
   Future<List<Map<String, dynamic>>> getMedicamentosCronicosPaciente(int id) async {
     final response = await _apiService.get('/pacientes/$id/medicamentos-cronicos');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // GET /api/pacientes/:id/habitos - (obtener hábitos del paciente)
+  // GET /api/pacientes/:id/habitos - obtener habitos del paciente
   Future<List<Map<String, dynamic>>> getHabitosPaciente(int id) async {
     final response = await _apiService.get('/pacientes/$id/habitos');
     return List<Map<String, dynamic>>.from(response.data);
@@ -154,7 +154,7 @@ class PacientesService {
     return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // GET /api/pacientes/:id/examenes - (obtener exámenes del paciente)
+  // GET /api/pacientes/:id/examenes - obtener examenes del paciente
   Future<List<Map<String, dynamic>>> getExamenesPaciente(int id) async {
     final response = await _apiService.get('/pacientes/$id/examenes');
     return List<Map<String, dynamic>>.from(response.data);

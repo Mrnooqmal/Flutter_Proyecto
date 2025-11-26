@@ -50,17 +50,17 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
     try {
       final pacientes = await _pacientesService.getPacientes();
       
-      // Obtener tipos de exámenes (simulado, en realidad deberías tener un endpoint)
+      // tipos de examenes hardcodeados
       final tiposExamenes = [
         {'id': 1, 'nombre': 'Hemograma completo'},
         {'id': 2, 'nombre': 'Glicemia en ayunas'},
-        {'id': 3, 'nombre': 'Perfil lipídico'},
+        {'id': 3, 'nombre': 'Perfil lipidico'},
         {'id': 4, 'nombre': 'Creatinina'},
         {'id': 5, 'nombre': 'Urea'},
         {'id': 6, 'nombre': 'Transaminasas (GOT/GPT)'},
         {'id': 7, 'nombre': 'TSH'},
         {'id': 8, 'nombre': 'Orina completa'},
-        {'id': 9, 'nombre': 'Radiografía de tórax'},
+        {'id': 9, 'nombre': 'Radiografia de torax'},
         {'id': 10, 'nombre': 'Electrocardiograma'},
       ];
 
@@ -149,7 +149,7 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Retornar true para indicar éxito
+        Navigator.pop(context, true); // retornar true para indicar exito
       }
     } catch (e) {
       setState(() => _subiendo = false);
@@ -342,7 +342,7 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Botón de subir
+                        // boton de subir
                         ElevatedButton.icon(
                           onPressed: _subiendo ? null : _subirArchivo,
                           icon: _subiendo
