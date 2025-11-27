@@ -7,19 +7,30 @@ import '../models/paciente.dart';
 import 'package:http/http.dart' as http;
 
 class PacientesService {
+  // Singleton pattern
+  static final PacientesService _instance = PacientesService._internal();
+  factory PacientesService() => _instance;
+  
   final ApiService _apiService = ApiService();
   late final StreamController<Map<String, dynamic>> _sseController;
   http.Client? _sseClient;
+  bool _isConnected = false;
   
-  PacientesService() {
+  PacientesService._internal() {
     _sseController = StreamController<Map<String, dynamic>>.broadcast();
   }
   
   // stream para escuchar los eventos del servidor
   Stream<Map<String, dynamic>> get sseStream => _sseController.stream;
+  bool get isConnected => _isConnected;
 
   // conectar al endpoint sse del backend
   void connectToSSE() async {
+    if (_isConnected) {
+      print('>>> ya conectado a SSE, ignorando');
+      return;
+    }
+    
     final String sseUrl = 'http://localhost:3001/api/pacientes/stream';
     
     print('>>> conectando a sse: $sseUrl');
@@ -36,6 +47,7 @@ class PacientesService {
       print('>>> respuesta sse status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
+        _isConnected = true;
         print('>>> conexion sse ok, escuchando eventos...');
         
         String? currentEvent;
@@ -68,9 +80,11 @@ class PacientesService {
           },
           onError: (error) {
             print('>>> error en sse stream: $error');
+            _isConnected = false;
           },
           onDone: () {
             print('>>> conexion sse cerrada por servidor');
+            _isConnected = false;
           },
         );
       } else {
@@ -79,13 +93,15 @@ class PacientesService {
     } catch (e, stackTrace) {
       print('>>> excepcion en sse: $e');
       print('>>> stack: $stackTrace');
+      _isConnected = false;
     }
   }
 
-  // cerrar conexion sse
+  // cerrar conexion sse (solo cuando la app se cierra)
   void dispose() {
     _sseController.close();
     _sseClient?.close();
+    _isConnected = false;
   }
 
   // GET /api/pacientes - (obtener todos)

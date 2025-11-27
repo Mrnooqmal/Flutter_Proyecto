@@ -80,6 +80,8 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _cargarDatos();
+    // Conectar SSE al inicio de la app
+    _pacientesService.connectToSSE();
   }
 
   Future<void> _cargarDatos() async {

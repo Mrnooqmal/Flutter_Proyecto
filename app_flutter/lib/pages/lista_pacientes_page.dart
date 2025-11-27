@@ -37,7 +37,8 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
   @override
   void dispose() {
     _sseSubscription?.cancel();
-    _pacientesService.dispose();
+    // NO cerrar el servicio SSE - mantenerlo vivo para toda la app
+    // _pacientesService.dispose();
     super.dispose();
   }
 
