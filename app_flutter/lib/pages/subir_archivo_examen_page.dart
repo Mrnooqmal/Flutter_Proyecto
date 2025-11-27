@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:app_flutter/core/models/paciente.dart';
 import 'package:app_flutter/core/services/pacientes_service.dart';
+import 'package:app_flutter/core/config/app_theme.dart';
+import 'package:app_flutter/core/config/environment.dart';
 
 class SubirArchivoExamenPage extends StatefulWidget {
   final int? idPacientePreseleccionado;
@@ -21,8 +24,10 @@ class SubirArchivoExamenPage extends StatefulWidget {
 class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
   final PacientesService _pacientesService = PacientesService();
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _searchController = TextEditingController();
   
   List<Paciente> _pacientes = [];
+  List<Paciente> _pacientesFiltrados = [];
   List<Map<String, dynamic>> _tiposExamenes = [];
   
   int? _pacienteSeleccionado;
@@ -39,6 +44,34 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
     super.initState();
     _pacienteSeleccionado = widget.idPacientePreseleccionado;
     _cargarDatos();
+    _searchController.addListener(_filtrarPacientes);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filtrarPacientes() {
+    final query = _searchController.text.trim().toLowerCase();
+    
+    setState(() {
+      if (query.isEmpty) {
+        _pacientesFiltrados = List.from(_pacientes);
+      } else {
+        _pacientesFiltrados = _pacientes.where((paciente) {
+          // buscar por id
+          final idStr = paciente.idPaciente?.toString() ?? '';
+          if (idStr.contains(query)) return true;
+          
+          // buscar por nombre
+          if (paciente.nombrePaciente.toLowerCase().contains(query)) return true;
+          
+          return false;
+        }).toList();
+      }
+    });
   }
 
   Future<void> _cargarDatos() async {
@@ -66,6 +99,7 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
 
       setState(() {
         _pacientes = pacientes;
+        _pacientesFiltrados = pacientes;
         _tiposExamenes = tiposExamenes;
         _isLoading = false;
       });
@@ -131,7 +165,7 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
       });
 
       final response = await dio.post(
-        'http://localhost:3001/api/examenes/upload',
+        '${Environment.apiBaseUrl}/examenes/upload',
         data: formData,
         options: Options(
           headers: {'Content-Type': 'multipart/form-data'},
@@ -174,25 +208,29 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Subir Examen Médico'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
+      backgroundColor: AppTheme.backgroundGrey,
+      appBar: AppTheme.buildAppBar(
+        title: 'Subir Examen Medico',
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryPurple),
+              ),
+            )
           : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+                      const Icon(CupertinoIcons.exclamationmark_circle, size: 60, color: AppTheme.red),
                       const SizedBox(height: 16),
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                      Text(_error!, style: const TextStyle(color: AppTheme.red)),
                       const SizedBox(height: 16),
-                      ElevatedButton(
+                      AppTheme.buildPrimaryButton(
+                        text: 'Reintentar',
+                        icon: CupertinoIcons.refresh,
                         onPressed: _cargarDatos,
-                        child: const Text('Reintentar'),
                       ),
                     ],
                   ),
@@ -204,164 +242,260 @@ class _SubirArchivoExamenPageState extends State<SubirArchivoExamenPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Seleccionar paciente
-                        if (widget.idPacientePreseleccionado == null)
-                          DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'Paciente',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.person),
+                        // Seleccionar paciente con busqueda
+                        if (widget.idPacientePreseleccionado == null) ...[
+                          AppTheme.buildCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AppTheme.buildSectionHeader(
+                                  title: 'Seleccionar Paciente',
+                                  icon: CupertinoIcons.person_fill,
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _searchController,
+                                  decoration: AppTheme.buildInputDecoration(
+                                    label: 'Buscar por ID o nombre',
+                                    hint: 'Ej: 123 o Juan Perez',
+                                    prefixIcon: CupertinoIcons.search,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  constraints: const BoxConstraints(maxHeight: 300),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppTheme.textLight.withOpacity(0.3)),
+                                    borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                                  ),
+                                  child: _pacientesFiltrados.isEmpty
+                                      ? Padding(
+                                          padding: const EdgeInsets.all(24),
+                                          child: Center(
+                                            child: Text(
+                                              _searchController.text.isEmpty
+                                                  ? 'No hay pacientes registrados'
+                                                  : 'No se encontraron pacientes',
+                                              style: const TextStyle(color: AppTheme.textGrey),
+                                            ),
+                                          ),
+                                        )
+                                      : ListView.separated(
+                                          shrinkWrap: true,
+                                          itemCount: _pacientesFiltrados.length,
+                                          separatorBuilder: (context, index) => const Divider(height: 1),
+                                          itemBuilder: (context, index) {
+                                            final paciente = _pacientesFiltrados[index];
+                                            final isSelected = _pacienteSeleccionado == paciente.idPaciente;
+                                            
+                                            return ListTile(
+                                              selected: isSelected,
+                                              selectedTileColor: AppTheme.primaryPurple.withOpacity(0.1),
+                                              leading: Container(
+                                                width: 40,
+                                                height: 40,
+                                                decoration: BoxDecoration(
+                                                  color: isSelected 
+                                                      ? AppTheme.primaryPurple.withOpacity(0.2)
+                                                      : AppTheme.blue.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    paciente.nombrePaciente.isNotEmpty
+                                                        ? paciente.nombrePaciente[0].toUpperCase()
+                                                        : '?',
+                                                    style: TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isSelected ? AppTheme.primaryPurple : AppTheme.blue,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              title: Text(
+                                                paciente.nombrePaciente,
+                                                style: TextStyle(
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                ),
+                                              ),
+                                              subtitle: Text('ID: ${paciente.idPaciente}'),
+                                              trailing: isSelected
+                                                  ? const Icon(CupertinoIcons.checkmark_circle_fill, color: AppTheme.primaryPurple)
+                                                  : null,
+                                              onTap: () {
+                                                setState(() => _pacienteSeleccionado = paciente.idPaciente);
+                                              },
+                                            );
+                                          },
+                                        ),
+                                ),
+                                if (_pacienteSeleccionado == null) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Debe seleccionar un paciente',
+                                    style: TextStyle(color: AppTheme.red, fontSize: 12),
+                                  ),
+                                ],
+                              ],
                             ),
-                            value: _pacienteSeleccionado,
-                            items: _pacientes.map((paciente) {
-                              return DropdownMenuItem<int>(
-                                value: paciente.idPaciente,
-                                child: Text(paciente.nombrePaciente),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() => _pacienteSeleccionado = value);
-                            },
-                            validator: (value) =>
-                                value == null ? 'Seleccione un paciente' : null,
-                          )
-                        else
-                          Card(
+                          ),
+                        ] else
+                          AppTheme.buildCard(
                             child: ListTile(
-                              leading: const Icon(Icons.person, color: Colors.teal),
-                              title: Text(widget.nombrePacientePreseleccionado!),
+                              leading: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryPurple.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(CupertinoIcons.person_fill, color: AppTheme.primaryPurple),
+                              ),
+                              title: Text(
+                                widget.nombrePacientePreseleccionado!,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
                               subtitle: const Text('Paciente seleccionado'),
                             ),
                           ),
                         const SizedBox(height: 16),
 
                         // Seleccionar tipo de examen
-                        DropdownButtonFormField<int>(
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo de Examen',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.science),
+                        AppTheme.buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppTheme.buildSectionHeader(
+                                title: 'Tipo de Examen',
+                                icon: CupertinoIcons.lab_flask_solid,
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<int>(
+                                decoration: AppTheme.buildInputDecoration(
+                                  label: 'Seleccione el tipo de examen',
+                                  prefixIcon: CupertinoIcons.list_bullet,
+                                ),
+                                value: _examenSeleccionado,
+                                items: _tiposExamenes.map((examen) {
+                                  return DropdownMenuItem<int>(
+                                    value: examen['id'],
+                                    child: Text(examen['nombre']),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() => _examenSeleccionado = value);
+                                },
+                                validator: (value) =>
+                                    value == null ? 'Seleccione un tipo de examen' : null,
+                              ),
+                            ],
                           ),
-                          value: _examenSeleccionado,
-                          items: _tiposExamenes.map((examen) {
-                            return DropdownMenuItem<int>(
-                              value: examen['id'],
-                              child: Text(examen['nombre']),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() => _examenSeleccionado = value);
-                          },
-                          validator: (value) =>
-                              value == null ? 'Seleccione un tipo de examen' : null,
                         ),
                         const SizedBox(height: 16),
 
                         // Observaciones
-                        TextFormField(
-                          decoration: const InputDecoration(
-                            labelText: 'Observaciones (opcional)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.note),
+                        AppTheme.buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppTheme.buildSectionHeader(
+                                title: 'Observaciones',
+                                icon: CupertinoIcons.text_alignleft,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                decoration: AppTheme.buildInputDecoration(
+                                  label: 'Observaciones (opcional)',
+                                  hint: 'Agregue notas o comentarios sobre el examen',
+                                  prefixIcon: CupertinoIcons.pencil,
+                                ),
+                                maxLines: 3,
+                                onSaved: (value) => _observacion = value,
+                              ),
+                            ],
                           ),
-                          maxLines: 3,
-                          onSaved: (value) => _observacion = value,
                         ),
                         const SizedBox(height: 16),
 
                         // Seleccionar archivo
-                        Card(
-                          elevation: 2,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Archivo',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                                const SizedBox(height: 12),
-                                if (_archivoSeleccionado == null)
-                                  ElevatedButton.icon(
-                                    onPressed: _seleccionarArchivo,
-                                    icon: const Icon(Icons.attach_file),
-                                    label: const Text('Seleccionar archivo (PDF o imagen)'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue[600],
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size(double.infinity, 48),
-                                    ),
-                                  )
-                                else
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.green[300]!),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          _archivoSeleccionado!.extension == 'pdf'
-                                              ? Icons.picture_as_pdf
-                                              : Icons.image,
-                                          color: Colors.green[700],
-                                          size: 32,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                _archivoSeleccionado!.name,
-                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              Text(
-                                                _formatFileSize(_archivoSeleccionado!.size),
-                                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.close),
-                                          onPressed: () {
-                                            setState(() => _archivoSeleccionado = null);
-                                          },
-                                        ),
-                                      ],
-                                    ),
+                        AppTheme.buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppTheme.buildSectionHeader(
+                                title: 'Archivo del Examen',
+                                icon: CupertinoIcons.doc_fill,
+                              ),
+                              const SizedBox(height: 12),
+                              if (_archivoSeleccionado == null)
+                                AppTheme.buildPrimaryButton(
+                                  text: 'Seleccionar archivo (PDF o imagen)',
+                                  icon: CupertinoIcons.paperclip,
+                                  onPressed: _seleccionarArchivo,
+                                  color: AppTheme.blue,
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                                    border: Border.all(color: AppTheme.green),
                                   ),
-                              ],
-                            ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        _archivoSeleccionado!.extension == 'pdf'
+                                            ? CupertinoIcons.doc_fill
+                                            : CupertinoIcons.photo_fill,
+                                        color: AppTheme.green,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _archivoSeleccionado!.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.textDark,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              _formatFileSize(_archivoSeleccionado!.size),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.textGrey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(CupertinoIcons.xmark_circle_fill, color: AppTheme.red),
+                                        onPressed: () {
+                                          setState(() => _archivoSeleccionado = null);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 24),
 
                         // boton de subir
-                        ElevatedButton.icon(
-                          onPressed: _subiendo ? null : _subirArchivo,
-                          icon: _subiendo
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.cloud_upload),
-                          label: Text(_subiendo ? 'Subiendo...' : 'Subir Examen'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 54),
-                            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
+                        AppTheme.buildPrimaryButton(
+                          text: _subiendo ? 'Subiendo...' : 'Subir Examen',
+                          icon: CupertinoIcons.cloud_upload_fill,
+                          onPressed: _pacienteSeleccionado == null ? () {} : _subirArchivo,
+                          isLoading: _subiendo,
                         ),
                       ],
                     ),

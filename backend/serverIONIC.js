@@ -1,38 +1,22 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-const multer = require('multer');
 const EventEmitter = require('events');
+const awsConfig = require('./aws-config');
 const eventEmitter = new EventEmitter();
 
 let sseClientes = [];
 
 const app = express();
+
 // AUMENTAR LÍMITES DE TAMAÑO - CRÍTICO PARA ARCHIVOS
 app.use(express.json({ limit: '50mb' })); // Aumentado de 1mb a 50mb
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Configurar multer para almacenar archivos en memoria
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 16 * 1024 * 1024, // 16MB maximo
-  },
-  fileFilter: (req, file, cb) => {
-    // aceptar solo PDFs e imagenes
-    if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Solo se permiten archivos PDF e imágenes'));
-    }
-  }
-});
-
-const db = mysql.createConnection({
-  host: 'localhost', //ip_publica_ec2 , remplazar cada que cambie
-  // para conectarse luego remotamente: mysql -h [ip_publica_ec2] -u meditrack_user2 -p , y luego password: M3d!Track2025
-  //"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -h 34.233.199.164 -u meditrack_user2 -p
+// Pool de conexiones MySQL
+const db = mysql.createPool({
+  host: '34.233.199.164',
   user: 'meditrack_user',
   password: 'PasswordSeguro123!',
   database: 'MediTrack',
@@ -43,47 +27,71 @@ const db = mysql.createConnection({
   keepAliveInitialDelay: 0
 });
 
-db.connect((err) => {
+// Probar conexión inicial
+db.getConnection((err, connection) => {
   if (err) {
-    console.error('Error conectando a MySQL:', err);
+    console.error('Error conectando a MySQL:', err.message);
+    setTimeout(() => {
+      db.getConnection((retryErr, retryConnection) => {
+        if (retryErr) {
+          console.error('Error en reintento:', retryErr.message);
+        } else {
+          console.log('Conectado a MySQL en EC2 (AWS)');
+          retryConnection.release();
+        }
+      });
+    }, 5000);
     return;
   }
-  console.log('Conectado a MySQL en EC2');
+  console.log('Conectado a MySQL en EC2 (AWS)');
+  connection.release();
 });
 
-
-// GET /api/pacientes - Obtener todos los pacientes
-app.get('/api/pacientes', (req, res) => {
-  const query = 'SELECT * FROM Paciente ORDER BY idPaciente DESC';
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error en MySQL:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// sse - endpoint para stream de cambios 
+// SSE - Endpoint para stream de cambios
 app.get('/api/pacientes/stream', (req, res) => {
-  // configurar headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  // comentario inicial
   res.write(': conexion sse ok\n\n');
-
-  // agregar cliente a la lista
   sseClientes.push(res);
-  console.log(`cliente sse conectado. total: ${sseClientes.length}`);
+  console.log(`Cliente SSE conectado. Total: ${sseClientes.length}`);
 
-  // manejar desconexion
   req.on('close', () => {
     sseClientes = sseClientes.filter(client => client !== res);
-    console.log(`cliente sse desconectado. total: ${sseClientes.length}`);
+    console.log(`Cliente SSE desconectado. Total: ${sseClientes.length}`);
+  });
+});
+
+// Función para notificar cambios via SSE
+function notificarClientes(evento, data) {
+  const mensaje = `event: ${evento}\ndata: ${JSON.stringify(data)}\n\n`;
+  console.log(`Notificando via SSE: ${evento}`, data);
+  sseClientes.forEach(client => {
+    try {
+      client.write(mensaje);
+    } catch (err) {
+      console.error('Error enviando SSE:', err.message);
+    }
+  });
+}
+
+// GET /api/pacientes - Obtener todos los pacientes
+app.get('/api/pacientes', (req, res) => {
+  const query = 'SELECT * FROM Paciente ORDER BY idPaciente DESC';
+ 
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error en GET /api/pacientes:', err.message);
+      return res.status(500).json({ 
+        error: 'Error obteniendo pacientes', 
+        details: err.message 
+      });
+    }
+    
+    console.log(`GET /api/pacientes - ${results.length} pacientes encontrados`);
+    res.json(results);
   });
 });
 
@@ -91,122 +99,140 @@ app.get('/api/pacientes/stream', (req, res) => {
 app.get('/api/pacientes/:id', (req, res) => {
   const { id } = req.params;
   const query = 'SELECT * FROM Paciente WHERE idPaciente = ?';
-  
+ 
   db.query(query, [id], (err, results) => {
     if (err) {
-      console.error('Error en MySQL:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
+      console.error(`Error en GET /api/pacientes/${id}:`, err.message);
+      return res.status(500).json({ 
+        error: 'Error del servidor', 
+        details: err.message 
+      });
     }
-    
+   
     if (results.length === 0) {
+      console.log(`GET /api/pacientes/${id} - Paciente no encontrado`);
       return res.status(404).json({ error: 'Paciente no encontrado' });
     }
-    
+   
+    console.log(`GET /api/pacientes/${id} - Paciente encontrado`);
     res.json(results[0]);
   });
 });
 
-
-// funcion para notificar cambios via sse a todos los clientes conectados
-function notificarClientes(evento, data) {
-  const mensaje = `event: ${evento}\ndata: ${JSON.stringify(data)}\n\n`;
-
-  console.log('notificando via sse:', evento, data);
-
-  sseClientes.forEach(client => {
-    client.write(mensaje);
-  });
-}
-
 // POST /api/pacientes - Crear nuevo paciente
 app.post('/api/pacientes', (req, res) => {
-  const { nombrePaciente, fechaNacimiento, correo, telefono, direccion, sexo, nacionalidad, ocupacion, prevision, tipoSangre, fotoPerfil } = req.body;
-  
-  // validar campos requeridos
+  const { 
+    nombrePaciente, 
+    fechaNacimiento, 
+    correo, 
+    telefono, 
+    direccion, 
+    sexo, 
+    nacionalidad, 
+    ocupacion, 
+    prevision, 
+    tipoSangre, 
+    fotoPerfil 
+  } = req.body;
+ 
+  // Validar campos requeridos
   if (!nombrePaciente || !fechaNacimiento || !sexo) {
-    return res.status(400).json({ error: 'faltan campos requeridos: nombrePaciente, fechaNacimiento, sexo' });
+    return res.status(400).json({ 
+      error: 'Faltan campos requeridos: nombrePaciente, fechaNacimiento, sexo' 
+    });
   }
-  
-  // validar que sexo sea uno de los valores permitidos
+ 
+  // Validar que sexo sea uno de los valores permitidos
   const sexosValidos = ['masculino', 'femenino', 'otro'];
   if (!sexosValidos.includes(sexo.toLowerCase())) {
-    return res.status(400).json({ error: 'sexo debe ser: masculino, femenino u otro' });
+    return res.status(400).json({ 
+      error: 'Sexo debe ser: masculino, femenino u otro' 
+    });
   }
-  
-  const query = `
-    INSERT INTO Paciente 
-    (nombrePaciente, fotoPerfil, fechaNacimiento, correo, telefono, direccion, sexo, nacionalidad, ocupacion, prevision, tipoSangre) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  
-  db.query(query, [
-    nombrePaciente,
-    fotoPerfil || null,
-    fechaNacimiento, 
-    correo || null, 
-    telefono || null, 
-    direccion || null, 
-    sexo.toLowerCase(), 
-    nacionalidad || null, 
-    ocupacion || null, 
-    prevision || null, 
-    tipoSangre || null
-  ], 
-    (err, results) => {
-      if (err) {
-        console.error('error en mysql:', err);
-        return res.status(500).json({ error: 'error creando paciente', details: err.message });
+
+  if (correo) {
+    const checkEmailQuery = 'SELECT idPaciente FROM Paciente WHERE correo = ?';
+    db.query(checkEmailQuery, [correo], (emailErr, emailResults) => {
+      if (emailErr) {
+        console.error('Error verificando email:', emailErr.message);
+        return res.status(500).json({ 
+          error: 'Error verificando correo', 
+          details: emailErr.message 
+        });
       }
-      
-      const nuevoPaciente = {
-        idPaciente: results.insertId,
-        nombrePaciente,
-        fotoPerfil,
-        fechaNacimiento,
-        correo,
-        telefono,
-        direccion,
-        sexo,
-        nacionalidad,
-        ocupacion,
-        prevision,
-        tipoSangre
-      };
 
-      res.json({ 
-        ...nuevoPaciente,
-        message: 'paciente creado ok'
-      });
+      if (emailResults && emailResults.length > 0) {
+        console.log(`Email ${correo} ya existe en la base de datos`);
+        return res.status(400).json({ 
+          error: 'El correo electrónico ya está registrado',
+          message: 'El correo electrónico ya está registrado',
+          code: 'DUPLICATE_EMAIL'
+        });
+      }
 
-      // notificar via sse
-      notificarClientes('paciente_creado', nuevoPaciente);
-    }
-  );
+      insertarPaciente();
+    });
+  } else {
+    insertarPaciente();
+  }
+
+  function insertarPaciente() {
+    const query = `
+      INSERT INTO Paciente
+      (nombrePaciente, fotoPerfil, fechaNacimiento, correo, telefono, direccion, sexo, nacionalidad, ocupacion, prevision, tipoSangre)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+   
+    db.query(query, [
+      nombrePaciente,
+      fotoPerfil || null,
+      fechaNacimiento,
+      correo || null,
+      telefono || null,
+      direccion || null,
+      sexo.toLowerCase(),
+      nacionalidad || null,
+      ocupacion || null,
+      prevision || null,
+      tipoSangre || null
+    ], (err, results) => {
+        if (err) {
+          console.error('Error en POST /api/pacientes:', err.message);
+          return res.status(500).json({ 
+            error: 'Error creando paciente', 
+            details: err.message 
+          });
+        }
+       
+        const nuevoPaciente = {
+          idPaciente: results.insertId,
+          nombrePaciente,
+          fotoPerfil: fotoPerfil || null,
+          fechaNacimiento,
+          correo: correo || null,
+          telefono: telefono || null,
+          direccion: direccion || null,
+          sexo: sexo.toLowerCase(),
+          nacionalidad: nacionalidad || null,
+          ocupacion: ocupacion || null,
+          prevision: prevision || null,
+          tipoSangre: tipoSangre || null
+        };
+
+        console.log(`POST /api/pacientes - Paciente creado con ID: ${results.insertId}`);
+        
+        res.status(201).json({
+          data: nuevoPaciente,
+          message: 'Paciente creado exitosamente'
+        });
+
+        notificarClientes('paciente_creado', nuevoPaciente);
+      }
+    );
+  }
 });
 
-// DELETE /api/pacientes/:id - Eliminar paciente
-app.delete('/api/pacientes/:id', (req, res) => {
-  const { id } = req.params;
-  const query = 'DELETE FROM Paciente WHERE idPaciente = ?';
-
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error en MySQL:', err);
-      return res.status(500).json({ error: 'Error eliminando paciente' });
-    }
-
-    if (results.affectedRows === 0) {
-      return res.status(404).json({ error: 'Paciente no encontrado' });
-    }
-
-    res.json({ message: 'Paciente eliminado exitosamente' });
-
-    // notificar SSE
-    notificarClientes('paciente_eliminado', { idPaciente: parseInt(id) });
-  });
-});
-
-// PUT /api/pacientes/:id - Actualizar paciente (CORREGIDO)
+// PUT /api/pacientes/:id - Actualizar paciente
 app.put('/api/pacientes/:id', (req, res) => {
   const { id } = req.params;
   const {
@@ -222,34 +248,38 @@ app.put('/api/pacientes/:id', (req, res) => {
     tipoSangre
   } = req.body;
 
-  console.log('>>> Actualizando paciente ID:', id);
-  console.log('>>> Correo recibido:', correo);
+  console.log(`PUT /api/pacientes/${id} - Actualizando paciente`);
+  console.log('Correo recibido:', correo);
 
   // Primero verificar si el paciente existe y obtener su correo actual
   const checkQuery = 'SELECT correo FROM Paciente WHERE idPaciente = ?';
-  
+ 
   db.query(checkQuery, [id], (checkErr, checkResults) => {
     if (checkErr) {
-      console.error('Error verificando paciente:', checkErr);
-      return res.status(500).json({ error: 'Error verificando paciente', details: checkErr.message });
+      console.error(`Error verificando paciente ${id}:`, checkErr.message);
+      return res.status(500).json({ 
+        error: 'Error verificando paciente', 
+        details: checkErr.message 
+      });
     }
 
     if (checkResults.length === 0) {
+      console.log(`PUT /api/pacientes/${id} - Paciente no encontrado`);
       return res.status(404).json({ error: 'Paciente no encontrado' });
     }
 
     const pacienteActual = checkResults[0];
     const correoActual = pacienteActual.correo;
-    
-    console.log('>>> Correo actual en BD:', correoActual);
-    console.log('>>> Correo nuevo recibido:', correo);
+   
+    console.log('Correo actual en BD:', correoActual);
+    console.log('Correo nuevo recibido:', correo);
 
-    // si el correo no cambio, hacer UPDATE normal
+    // Si el correo no cambió, hacer UPDATE normal
     if (correo === correoActual || correo === null || correo === '') {
-      console.log('>>> Correo no cambio o es nulo, procediendo con UPDATE normal');
-      
+      console.log('Correo no cambió o es nulo, procediendo con UPDATE normal');
+     
       const updateQuery = `
-        UPDATE Paciente 
+        UPDATE Paciente
         SET nombrePaciente = ?, fechaNacimiento = ?, correo = ?, telefono = ?,
         direccion = ?, sexo = ?, nacionalidad = ?, ocupacion = ?,
         prevision = ?, tipoSangre = ?
@@ -272,14 +302,17 @@ app.put('/api/pacientes/:id', (req, res) => {
 
       db.query(updateQuery, values, (updateErr, updateResult) => {
         if (updateErr) {
-          console.error('Error en UPDATE:', updateErr);
-          return res.status(500).json({ error: 'Error actualizando paciente', details: updateErr.message });
+          console.error(`Error en UPDATE paciente ${id}:`, updateErr.message);
+          return res.status(500).json({ 
+            error: 'Error actualizando paciente', 
+            details: updateErr.message 
+          });
         }
-        
+       
         if (updateResult.affectedRows === 0) {
           return res.status(404).json({ error: 'Paciente no encontrado' });
         }
-        
+       
         const pacienteActualizado = {
           idPaciente: parseInt(id),
           nombrePaciente,
@@ -294,34 +327,39 @@ app.put('/api/pacientes/:id', (req, res) => {
           tipoSangre
         };
 
-        console.log('✅ Paciente actualizado exitosamente. ID:', id);
+        console.log(`PUT /api/pacientes/${id} - Paciente actualizado exitosamente`);
         res.json(pacienteActualizado);
 
-        // notificar SSE
+        // Notificar SSE
         notificarClientes('paciente_actualizado', pacienteActualizado);
       });
     } else {
-      // si el correo cambio, verificar que no exista en otro paciente
-      console.log('>>> Correo cambio, verificando duplicado...');
-      
+      // Si el correo cambió, verificar que no exista en otro paciente
+      console.log('Correo cambió, verificando duplicado...');
+     
       const checkEmailQuery = 'SELECT idPaciente FROM Paciente WHERE correo = ? AND idPaciente != ?';
-      
+     
       db.query(checkEmailQuery, [correo, id], (emailErr, emailResults) => {
         if (emailErr) {
-          console.error('Error verificando correo:', emailErr);
-          return res.status(500).json({ error: 'Error verificando correo', details: emailErr.message });
+          console.error('Error verificando correo:', emailErr.message);
+          return res.status(500).json({ 
+            error: 'Error verificando correo', 
+            details: emailErr.message 
+          });
         }
 
         if (emailResults.length > 0) {
-          console.log('❌ Correo ya existe en otro paciente');
-          return res.status(400).json({ error: 'El correo electrónico ya está en uso por otro paciente' });
+          console.log('Correo ya existe en otro paciente');
+          return res.status(400).json({ 
+            error: 'El correo electrónico ya está en uso por otro paciente' 
+          });
         }
 
         // Si el correo no existe en otro paciente, proceder con UPDATE
-        console.log('✅ Correo disponible, procediendo con UPDATE');
-        
+        console.log('Correo disponible, procediendo con UPDATE');
+       
         const updateQuery = `
-          UPDATE Paciente 
+          UPDATE Paciente
           SET nombrePaciente = ?, fechaNacimiento = ?, correo = ?, telefono = ?,
           direccion = ?, sexo = ?, nacionalidad = ?, ocupacion = ?,
           prevision = ?, tipoSangre = ?
@@ -344,14 +382,17 @@ app.put('/api/pacientes/:id', (req, res) => {
 
         db.query(updateQuery, values, (updateErr, updateResult) => {
           if (updateErr) {
-            console.error('Error en UPDATE:', updateErr);
-            return res.status(500).json({ error: 'Error actualizando paciente', details: updateErr.message });
+            console.error(`Error en UPDATE paciente ${id}:`, updateErr.message);
+            return res.status(500).json({ 
+              error: 'Error actualizando paciente', 
+              details: updateErr.message 
+            });
           }
-          
+         
           if (updateResult.affectedRows === 0) {
             return res.status(404).json({ error: 'Paciente no encontrado' });
           }
-          
+         
           const pacienteActualizado = {
             idPaciente: parseInt(id),
             nombrePaciente,
@@ -366,587 +407,16 @@ app.put('/api/pacientes/:id', (req, res) => {
             tipoSangre
           };
 
-          console.log('Paciente actualizado exitosamente. ID:', id);
+          console.log(`PUT /api/pacientes/${id} - Paciente actualizado exitosamente`);
           res.json(pacienteActualizado);
 
+          // Notificar SSE
           notificarClientes('paciente_actualizado', pacienteActualizado);
         });
       });
     }
   });
 });
-
-// ====================================
-// ENDPOINTS PARA FICHA MEDICA DETALLADA
-// ====================================
-
-// GET /api/pacientes/:id/consultas - Obtener consultas de un paciente
-app.get('/api/pacientes/:id/consultas', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      c.idConsulta,
-      c.fechaIngreso,
-      c.motivo,
-      c.observacion,
-      c.condicionEgreso,
-      tc.nombreTipoConsulta,
-      ps.nombre as nombreProfesional,
-      ps.especialidad,
-      ss.nombreServicioSalud
-    FROM Consulta c
-    LEFT JOIN TipoConsulta tc ON c.idTipoConsulta = tc.idTipoConsulta
-    LEFT JOIN ProfesionalSalud ps ON c.idProfesionalSalud = ps.idProfesionalSalud
-    LEFT JOIN ServicioSalud ss ON c.idServicioSalud = ss.idServicioSalud
-    WHERE c.idPaciente = ?
-    ORDER BY c.fechaIngreso DESC
-    LIMIT 10
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo consultas:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/pacientes/:id/signos-vitales - Obtener signos vitales de un paciente
-app.get('/api/pacientes/:id/signos-vitales', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      dc.idConsulta,
-      c.fechaIngreso,
-      dcl.nombre as tipoDato,
-      dcl.unidadMedida,
-      dc.valor,
-      dc.fechaRegistro
-    FROM DetalleConsulta dc
-    INNER JOIN Consulta c ON dc.idConsulta = c.idConsulta
-    INNER JOIN DatoClinico dcl ON dc.idDatoClinico = dcl.idDatoClinico
-    WHERE c.idPaciente = ?
-    ORDER BY dc.fechaRegistro DESC, dc.idConsulta DESC
-    LIMIT 30
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo signos vitales:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/pacientes/:id/medicamentos-cronicos - obtener medicamentos cronicos de un paciente
-app.get('/api/pacientes/:id/medicamentos-cronicos', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      m.idMedicamento,
-      m.nombreMedicamento,
-      m.empresa,
-      mcp.fechaInicio,
-      mcp.fechaFin,
-      mcp.cronico
-    FROM MedicamentoCronicoPaciente mcp
-    INNER JOIN Medicamento m ON mcp.idMedicamento = m.idMedicamento
-    WHERE mcp.idPaciente = ?
-    ORDER BY mcp.fechaInicio DESC
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo medicamentos cronicos:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/pacientes/:id/habitos - obtener habitos de un paciente
-app.get('/api/pacientes/:id/habitos', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      h.idHabito,
-      h.habito as nombreHabito,
-      hp.observacion
-    FROM HabitoPaciente hp
-    INNER JOIN Habito h ON hp.idHabito = h.idHabito
-    WHERE hp.idPaciente = ?
-    ORDER BY h.habito
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo hábitos:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/pacientes/:id/alergias - Obtener alergias de un paciente
-app.get('/api/pacientes/:id/alergias', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      a.idAlergia,
-      a.alergia as nombreAlergia,
-      ap.observacion,
-      ap.fechaRegistro
-    FROM AlergiaPaciente ap
-    INNER JOIN Alergia a ON ap.idAlergia = a.idAlergia
-    WHERE ap.idPaciente = ?
-    ORDER BY ap.fechaRegistro DESC
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo alergias:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/pacientes/:id/vacunas - Obtener vacunas de un paciente
-app.get('/api/pacientes/:id/vacunas', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      v.idVacuna,
-      v.nombre as nombreVacuna,
-      v.observacion as descripcionVacuna,
-      pv.fecha,
-      pv.dosis,
-      pv.observacion
-    FROM PacienteVacuna pv
-    INNER JOIN Vacuna v ON pv.idVacuna = v.idVacuna
-    WHERE pv.idPaciente = ?
-    ORDER BY pv.fecha DESC
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo vacunas:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/pacientes/:id/examenes - obtener examenes de un paciente
-app.get('/api/pacientes/:id/examenes', (req, res) => {
-  const { id } = req.params;
-  
-  const query = `
-    SELECT 
-      e.idExamen,
-      e.nombreExamen,
-      e.tipoExamen,
-      e.unidadMedida,
-      e.valorReferencia,
-      ce.fecha,
-      ce.observacion,
-      ce.idConsulta,
-      ce.archivoNombre,
-      ce.archivoTipo,
-      ce.archivoSize,
-      ce.archivoFechaSubida,
-      c.fechaIngreso as fechaConsulta,
-      tc.nombreTipoConsulta
-    FROM ConsultaExamen ce
-    INNER JOIN Examen e ON ce.idExamen = e.idExamen
-    INNER JOIN Consulta c ON ce.idConsulta = c.idConsulta
-    LEFT JOIN TipoConsulta tc ON c.idTipoConsulta = tc.idTipoConsulta
-    WHERE c.idPaciente = ?
-    ORDER BY ce.fecha DESC
-    LIMIT 20
-  `;
-  
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo exámenes:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/examenes/:idExamen/:idConsulta/archivo - Obtener archivo de examen (metadata + base64)
-app.get('/api/examenes/:idExamen/:idConsulta/archivo', (req, res) => {
-  const { idExamen, idConsulta } = req.params;
-  
-  const query = `
-    SELECT 
-      archivoNombre,
-      archivoTipo,
-      archivoSize,
-      archivoBlob,
-      archivoFechaSubida
-    FROM ConsultaExamen
-    WHERE idExamen = ? AND idConsulta = ?
-  `;
-  
-  db.query(query, [idExamen, idConsulta], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo archivo:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    
-    if (results.length === 0 || !results[0].archivoBlob) {
-      return res.status(404).json({ error: 'Archivo no encontrado' });
-    }
-    
-    const archivo = results[0];
-    
-    // Convertir BLOB a base64
-    const base64 = archivo.archivoBlob.toString('base64');
-    
-    res.json({
-      nombre: archivo.archivoNombre,
-      tipo: archivo.archivoTipo,
-      size: archivo.archivoSize,
-      fechaSubida: archivo.archivoFechaSubida,
-      contenido: base64
-    });
-  });
-});
-
-// GET /api/examenes/:idExamen/:idConsulta/download - Descargar archivo directamente
-app.get('/api/examenes/:idExamen/:idConsulta/download', (req, res) => {
-  const { idExamen, idConsulta } = req.params;
-  
-  const query = `
-    SELECT 
-      archivoNombre,
-      archivoTipo,
-      archivoBlob
-    FROM ConsultaExamen
-    WHERE idExamen = ? AND idConsulta = ?
-  `;
-  
-  db.query(query, [idExamen, idConsulta], (err, results) => {
-    if (err) {
-      console.error('Error descargando archivo:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
-    
-    if (results.length === 0 || !results[0].archivoBlob) {
-      return res.status(404).json({ error: 'Archivo no encontrado' });
-    }
-    
-    const archivo = results[0];
-    
-    // Configurar headers para descarga
-    res.setHeader('Content-Type', archivo.archivoTipo);
-    res.setHeader('Content-Disposition', `attachment; filename="${archivo.archivoNombre}"`);
-    res.setHeader('Content-Length', archivo.archivoBlob.length);
-    
-    // Enviar archivo
-    res.send(archivo.archivoBlob);
-  });
-});
-
-// POST /api/examenes/upload - Subir archivo de examen
-app.post('/api/examenes/upload', upload.single('archivo'), async (req, res) => {
-  try {
-    const { idPaciente, idExamen, observacion } = req.body;
-    
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se proporcionó archivo' });
-    }
-    
-    if (!idPaciente || !idExamen) {
-      return res.status(400).json({ error: 'idPaciente e idExamen son requeridos' });
-    }
-
-    // buscar ultima consulta del paciente o crear una nueva
-    db.query(
-      'SELECT idConsulta FROM Consulta WHERE idPaciente = ? ORDER BY fechaIngreso DESC LIMIT 1',
-      [idPaciente],
-      (err, consultas) => {
-        if (err) {
-          console.error('Error buscando consulta:', err);
-          return res.status(500).json({ error: 'Error del servidor' });
-        }
-
-        let idConsulta;
-
-        const insertarExamen = (consultaId) => {
-          const fecha = new Date().toISOString().split('T')[0];
-          const archivoNombre = req.file.originalname;
-          const archivoTipo = req.file.mimetype;
-          const archivoBlob = req.file.buffer;
-          const archivoSize = req.file.size;
-
-          // Insertar examen con archivo
-          db.query(
-            `INSERT INTO ConsultaExamen 
-             (idExamen, idConsulta, fecha, observacion, archivoNombre, archivoTipo, archivoBlob, archivoSize, archivoFechaSubida) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-            [idExamen, consultaId, fecha, observacion || null, archivoNombre, archivoTipo, archivoBlob, archivoSize],
-            (err, result) => {
-              if (err) {
-                console.error('Error insertando examen:', err);
-                return res.status(500).json({ error: 'Error guardando examen' });
-              }
-
-              res.json({
-                success: true,
-                message: 'Archivo subido exitosamente',
-                idConsulta: consultaId,
-                idExamen: idExamen,
-                archivoNombre: archivoNombre,
-                archivoSize: archivoSize
-              });
-            }
-          );
-        };
-
-        if (consultas.length > 0) {
-          // Usar consulta existente
-          insertarExamen(consultas[0].idConsulta);
-        } else {
-          // Crear nueva consulta
-          db.query(
-            `INSERT INTO Consulta (idPaciente, fechaIngreso, motivo, idTipoConsulta) 
-             VALUES (?, NOW(), 'Subida de examen', 1)`,
-            [idPaciente],
-            (err, result) => {
-              if (err) {
-                console.error('Error creando consulta:', err);
-                return res.status(500).json({ error: 'Error creando consulta' });
-              }
-              insertarExamen(result.insertId);
-            }
-          );
-        }
-      }
-    );
-  } catch (error) {
-    console.error('Error en upload:', error);
-    res.status(500).json({ error: 'Error procesando archivo' });
-  }
-});
-
-// ====================================
-// DASHBOARD ENDPOINTS
-// ====================================
-
-// GET /api/dashboard/stats - estadisticas principales
-app.get('/api/dashboard/stats', (req, res) => {
-  const queries = {
-    totalPacientes: 'SELECT COUNT(*) as total FROM Paciente',
-    consultasHoy: `SELECT COUNT(*) as total FROM Consulta WHERE fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`,
-    pacientesCriticos: `
-      SELECT COUNT(DISTINCT c.idPaciente) as total
-      FROM DetalleConsulta dc
-      JOIN Consulta c ON dc.idConsulta = c.idConsulta
-      WHERE c.fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        AND (
-          (dc.idDatoClinico = 2 AND (dc.valor < 36 OR dc.valor > 38))
-          OR (dc.idDatoClinico = 5 AND dc.valor > 140)
-        )
-    `,
-    examenesPendientes: `
-      SELECT COUNT(*) as total 
-      FROM ConsultaExamen ce
-      JOIN Consulta c ON ce.idConsulta = c.idConsulta
-      WHERE c.fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-    `
-  };
-
-  const stats = {};
-  let completedQueries = 0;
-  const totalQueries = Object.keys(queries).length;
-
-  Object.keys(queries).forEach(key => {
-    db.query(queries[key], (err, results) => {
-      if (err) {
-        console.error(`Error en query ${key}:`, err);
-        stats[key] = 0;
-      } else {
-        stats[key] = results[0].total;
-      }
-      
-      completedQueries++;
-      if (completedQueries === totalQueries) {
-        res.json(stats);
-      }
-    });
-  });
-});
-
-// GET /api/dashboard/consultas-por-dia - consultas de los ultimos 30 dias
-app.get('/api/dashboard/consultas-por-dia', (req, res) => {
-  const dias = req.query.dias || 30;
-  
-  const query = `
-    SELECT 
-      DATE(fechaIngreso) as fecha,
-      COUNT(*) as cantidad
-    FROM Consulta
-    WHERE fechaIngreso >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    GROUP BY DATE(fechaIngreso)
-    ORDER BY fecha ASC
-  `;
-  
-  db.query(query, [dias], (err, results) => {
-    if (err) {
-      console.error('Error obteniendo consultas por dia:', err);
-      return res.status(500).json({ error: 'Error obteniendo datos' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/dashboard/pacientes-por-edad - distribucion de pacientes por rango etario
-app.get('/api/dashboard/pacientes-por-edad', (req, res) => {
-  const query = `
-    SELECT 
-      CASE 
-        WHEN TIMESTAMPDIFF(YEAR, fechaNacimiento, CURDATE()) < 18 THEN '0-17'
-        WHEN TIMESTAMPDIFF(YEAR, fechaNacimiento, CURDATE()) BETWEEN 18 AND 40 THEN '18-40'
-        WHEN TIMESTAMPDIFF(YEAR, fechaNacimiento, CURDATE()) BETWEEN 41 AND 65 THEN '41-65'
-        ELSE '65+'
-      END as rangoEdad,
-      COUNT(*) as cantidad
-    FROM Paciente
-    GROUP BY rangoEdad
-    ORDER BY rangoEdad
-  `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error obteniendo distribucion por edad:', err);
-      return res.status(500).json({ error: 'Error obteniendo datos' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/dashboard/top-examenes - top 5 examenes mas solicitados
-app.get('/api/dashboard/top-examenes', (req, res) => {
-  const query = `
-    SELECT 
-      e.nombreExamen as examen,
-      COUNT(*) as cantidad
-    FROM ConsultaExamen ce
-    INNER JOIN Examen e ON ce.idExamen = e.idExamen
-    GROUP BY e.idExamen, e.nombreExamen
-    ORDER BY cantidad DESC
-    LIMIT 5
-  `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error obteniendo top examenes:', err);
-      return res.status(500).json({ error: 'Error obteniendo datos' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/dashboard/top-medicamentos - top 5 medicamentos mas recetados
-app.get('/api/dashboard/top-medicamentos', (req, res) => {
-  const query = `
-    SELECT 
-      m.nombreMedicamento as medicamento,
-      COUNT(*) as cantidad
-    FROM MedicamentoCronicoPaciente mc
-    INNER JOIN Medicamento m ON mc.idMedicamento = m.idMedicamento
-    GROUP BY m.idMedicamento, m.nombreMedicamento
-    ORDER BY cantidad DESC
-    LIMIT 5
-  `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error obteniendo top medicamentos:', err);
-      return res.status(500).json({ error: 'Error obteniendo datos' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/dashboard/ultimas-consultas - ultimas 5 consultas registradas
-app.get('/api/dashboard/ultimas-consultas', (req, res) => {
-  const query = `
-    SELECT 
-      c.idConsulta,
-      c.fechaIngreso,
-      c.motivo,
-      p.nombrePaciente,
-      p.idPaciente
-    FROM Consulta c
-    INNER JOIN Paciente p ON c.idPaciente = p.idPaciente
-    ORDER BY c.fechaIngreso DESC
-    LIMIT 5
-  `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error obteniendo últimas consultas:', err);
-      return res.status(500).json({ error: 'Error obteniendo datos' });
-    }
-    res.json(results);
-  });
-});
-
-// GET /api/dashboard/alertas-signos-vitales - Pacientes con signos vitales anormales
-app.get('/api/dashboard/alertas-signos-vitales', (req, res) => {
-  const query = `
-    SELECT 
-      p.idPaciente,
-      p.nombrePaciente,
-      MAX(CASE WHEN dc.idDatoClinico = 1 THEN dc.valor END) as presionArterial,
-      MAX(CASE WHEN dc.idDatoClinico = 2 THEN dc.valor END) as temperatura,
-      MAX(CASE WHEN dc.idDatoClinico = 3 THEN dc.valor END) as peso,
-      MAX(CASE WHEN dc.idDatoClinico = 5 THEN dc.valor END) as glucosa,
-      dc.fechaRegistro as fechaMedicion,
-      CASE
-        WHEN MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 38 THEN 'Fiebre'
-        WHEN MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 35 THEN 'Hipotermia'
-        WHEN MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 200 THEN 'Glucosa alta'
-        WHEN MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 70 THEN 'Glucosa baja'
-        ELSE 'Otro'
-      END as alerta
-    FROM DetalleConsulta dc
-    INNER JOIN Consulta c ON dc.idConsulta = c.idConsulta
-    INNER JOIN Paciente p ON c.idPaciente = p.idPaciente
-    WHERE dc.fechaRegistro >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    AND dc.idDatoClinico IN (1, 2, 3, 5)
-    GROUP BY p.idPaciente, p.nombrePaciente, dc.fechaRegistro
-    HAVING (
-      MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 38 OR
-      MAX(CASE WHEN dc.idDatoClinico = 2 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 35 OR
-      MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) > 200 OR
-      MAX(CASE WHEN dc.idDatoClinico = 5 THEN CAST(dc.valor AS DECIMAL(10,2)) END) < 70
-    )
-    ORDER BY dc.fechaRegistro DESC
-    LIMIT 10
-  `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error obteniendo alertas de signos vitales:', err);
-      return res.status(500).json({ error: 'Error obteniendo datos' });
-    }
-    res.json(results);
-  });
-});
-
 
 // DELETE /api/pacientes/:id - Eliminar paciente
 app.delete('/api/pacientes/:id', (req, res) => {
@@ -2618,7 +2088,6 @@ app.get('/api/dashboard/recent-patients', async (req, res) => {
     });
   }
 });
-
 
 // ==========================================
 // MANEJO DE ERRORES Y SEÑALES

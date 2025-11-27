@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../core/services/dashboard_service.dart';
+import '../core/config/app_theme.dart';
 import 'ficha_medica_detalle_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -69,38 +71,43 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard Médico'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
+      backgroundColor: AppTheme.backgroundGrey,
+      appBar: AppTheme.buildAppBar(
+        title: 'Dashboard Medico',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(CupertinoIcons.refresh),
             onPressed: _cargarDatos,
             tooltip: 'Actualizar',
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryPurple),
+              ),
+            )
           : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                      const Icon(CupertinoIcons.exclamationmark_circle, size: 60, color: AppTheme.red),
                       const SizedBox(height: 16),
                       Text(_error!, textAlign: TextAlign.center),
                       const SizedBox(height: 16),
-                      ElevatedButton(
+                      AppTheme.buildPrimaryButton(
+                        text: 'Reintentar',
+                        icon: CupertinoIcons.refresh,
                         onPressed: _cargarDatos,
-                        child: const Text('Reintentar'),
                       ),
                     ],
                   ),
                 )
               : RefreshIndicator(
                   onRefresh: _cargarDatos,
+                  color: AppTheme.primaryPurple,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
@@ -149,11 +156,8 @@ class _DashboardPageState extends State<DashboardPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.teal.shade700, Colors.teal.shade400],
-        ),
+        gradient: AppTheme.purpleGradient,
+        boxShadow: AppTheme.lightShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +169,7 @@ class _DashboardPageState extends State<DashboardPage> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.dashboard, color: Colors.white, size: 28),
+                    const Icon(CupertinoIcons.chart_bar_alt_fill, color: Colors.white, size: 28),
                     const SizedBox(width: 12),
                     const Text(
                       'Dashboard Medico',
@@ -190,9 +194,9 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: const BorderRadius.only(
+              borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(24),
                 topRight: Radius.circular(24),
               ),

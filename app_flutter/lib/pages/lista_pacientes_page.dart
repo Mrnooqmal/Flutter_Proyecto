@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:app_flutter/core/services/pacientes_service.dart';
 import 'package:app_flutter/core/models/paciente.dart';
 import 'package:app_flutter/pages/subir_archivo_examen_page.dart';
+import 'package:app_flutter/core/config/app_theme.dart';
 import 'dart:async';
 
 class ListaPacientesPage extends StatefulWidget {
@@ -620,16 +622,17 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lista de Pacientes'),
+      backgroundColor: AppTheme.backgroundGrey,
+      appBar: AppTheme.buildAppBar(
+        title: 'Lista de Pacientes',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(CupertinoIcons.refresh),
             tooltip: 'Recargar',
             onPressed: _cargarPacientes,
           ),
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(CupertinoIcons.add),
             tooltip: 'Crear paciente',
             onPressed: () {
               Navigator.of(context).pushNamed('/profile');
@@ -650,8 +653,8 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
             _cargarPacientes(); // recargar si se subio un archivo
           }
         },
-        backgroundColor: Colors.teal,
-        icon: const Icon(Icons.upload_file),
+        backgroundColor: AppTheme.primaryPurple,
+        icon: const Icon(CupertinoIcons.arrow_up_doc),
         label: const Text('Subir Examen'),
       ),
     );
@@ -663,9 +666,14 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryPurple),
+            ),
             SizedBox(height: 16),
-            Text('Cargando pacientes...'),
+            Text(
+              'Cargando pacientes...',
+              style: TextStyle(color: AppTheme.textGrey),
+            ),
           ],
         ),
       );
@@ -674,27 +682,31 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
     if (_errorMessage != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: AppTheme.pagePadding,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const Icon(CupertinoIcons.exclamationmark_circle, size: 64, color: AppTheme.red),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Error al cargar pacientes',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textDark,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600]),
+                style: const TextStyle(color: AppTheme.textGrey),
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
+              AppTheme.buildPrimaryButton(
+                text: 'Reintentar',
+                icon: CupertinoIcons.refresh,
                 onPressed: _cargarPacientes,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
               ),
             ],
           ),
@@ -707,22 +719,26 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+            Icon(CupertinoIcons.person_2, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'No hay pacientes registrados',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textDark,
+              ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Crea tu primer paciente usando el botón +',
-              style: TextStyle(color: Colors.grey[600]),
+            const Text(
+              'Crea tu primer paciente usando el boton +',
+              style: TextStyle(color: AppTheme.textGrey),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
+            AppTheme.buildPrimaryButton(
+              text: 'Crear Paciente',
+              icon: CupertinoIcons.add,
               onPressed: () => Navigator.of(context).pushNamed('/profile'),
-              icon: const Icon(Icons.add),
-              label: const Text('Crear Paciente'),
             ),
           ],
         ),
@@ -732,32 +748,55 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
     // Build search + filtered list
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
+        Container(
+          color: AppTheme.white,
+          padding: const EdgeInsets.all(16),
+          child: Column(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por ID, nombre o email',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(CupertinoIcons.search, color: AppTheme.primaryPurple),
+                  hintText: 'Buscar por ID, nombre o email',
+                  filled: true,
+                  fillColor: AppTheme.backgroundGrey,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                    borderSide: BorderSide.none,
                   ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                value: _selectedPrevision,
-                items: _previsionOptions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  setState(() {
-                    _selectedPrevision = v;
-                    _applyFilter();
-                  });
-                },
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(CupertinoIcons.slider_horizontal_3, size: 20, color: AppTheme.textGrey),
+                  const SizedBox(width: 8),
+                  const Text('Filtrar por prevision:', style: TextStyle(color: AppTheme.textGrey)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.backgroundGrey,
+                        borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                      ),
+                      child: DropdownButton<String>(
+                        value: _selectedPrevision,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: _previsionOptions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _selectedPrevision = v;
+                            _applyFilter();
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -765,69 +804,184 @@ class _ListaPacientesPageState extends State<ListaPacientesPage> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _cargarPacientes,
+            color: AppTheme.primaryPurple,
             child: ListView.builder(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(16),
               itemCount: _filteredPacientes.length,
               itemBuilder: (context, index) {
                 final paciente = _filteredPacientes[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: paciente.sexo == 'masculino' ? Colors.blue[300] : Colors.pink[300],
-                      child: Text(
-                        paciente.nombrePaciente[0].toUpperCase(),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    title: Text(paciente.nombrePaciente, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('ID: ${paciente.idPaciente}'),
-                        Text('Nacimiento: ${paciente.fechaNacimientoFormatted}'),
-                        if (paciente.correo != null) Text('📧 ${paciente.correo}'),
-                      ],
-                    ),
-                    trailing: PopupMenuButton(
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'ver',
-                          child: Row(children: [Icon(Icons.visibility, size: 20), SizedBox(width: 8), Text('Ver detalle')]),
-                        ),
-                        const PopupMenuItem(
-                          value: 'ficha',
-                          child: Row(children: [Icon(Icons.medical_information, size: 20, color: Colors.blue), SizedBox(width: 8), Text('Ficha médica', style: TextStyle(color: Colors.blue))]),
-                        ),
-                        const PopupMenuItem(
-                          value: 'editar',
-                          child: Row(children: [Icon(Icons.edit, size: 20, color: Colors.orange), SizedBox(width: 8), Text('Editar', style: TextStyle(color: Colors.orange))]),
-                        ),
-                        const PopupMenuItem(
-                          value: 'eliminar',
-                          child: Row(children: [Icon(Icons.delete, size: 20, color: Colors.red), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: Colors.red))]),
-                        ),
-                      ],
-                      onSelected: (value) {
-                        if (value == 'ver') {
-                          _verDetallePaciente(paciente);
-                        } else if (value == 'ficha') {
-                          Navigator.of(context).pushNamed('/ficha-medica/${paciente.idPaciente}');
-                        } else if (value == 'editar') {
-                          _editarPaciente(paciente);
-                        } else if (value == 'eliminar') {
-                          _eliminarPaciente(paciente);
-                        }
-                      },
-                    ),
-                    onTap: () => Navigator.of(context).pushNamed('/ficha-medica/${paciente.idPaciente}'),
-                  ),
-                );
+                return _buildPacienteCard(paciente);
               },
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPacienteCard(Paciente paciente) {
+    Color avatarColor = AppTheme.primaryPurple;
+    if (paciente.sexo.toLowerCase().contains('masc')) {
+      avatarColor = AppTheme.blue;
+    } else if (paciente.sexo.toLowerCase().contains('fem')) {
+      avatarColor = AppTheme.pink;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: InkWell(
+        onTap: () => Navigator.of(context).pushNamed('/ficha-medica/${paciente.idPaciente}'),
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: avatarColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    paciente.nombrePaciente.isNotEmpty 
+                        ? paciente.nombrePaciente[0].toUpperCase() 
+                        : '?',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: avatarColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      paciente.nombrePaciente,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(CupertinoIcons.number, size: 14, color: AppTheme.textGrey),
+                        const SizedBox(width: 4),
+                        Text(
+                          'ID: ${paciente.idPaciente}',
+                          style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(CupertinoIcons.calendar, size: 14, color: AppTheme.textGrey),
+                        const SizedBox(width: 4),
+                        Text(
+                          paciente.fechaNacimientoFormatted,
+                          style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                        ),
+                      ],
+                    ),
+                    if (paciente.correo != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(CupertinoIcons.mail, size: 14, color: AppTheme.textGrey),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              paciente.correo!,
+                              style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (paciente.prevision != null) ...[
+                      const SizedBox(height: 8),
+                      AppTheme.buildChip(
+                        label: paciente.prevision!,
+                        color: AppTheme.blue,
+                        icon: CupertinoIcons.briefcase,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuButton(
+                icon: const Icon(CupertinoIcons.ellipsis_vertical, color: AppTheme.textGrey),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                ),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'ver',
+                    child: Row(
+                      children: [
+                        Icon(CupertinoIcons.eye, size: 20, color: AppTheme.primaryPurple),
+                        SizedBox(width: 12),
+                        Text('Ver detalle'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'ficha',
+                    child: Row(
+                      children: [
+                        Icon(CupertinoIcons.doc_text, size: 20, color: AppTheme.blue),
+                        SizedBox(width: 12),
+                        Text('Ficha medica'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'editar',
+                    child: Row(
+                      children: [
+                        Icon(CupertinoIcons.pencil, size: 20, color: AppTheme.orange),
+                        SizedBox(width: 12),
+                        Text('Editar'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'eliminar',
+                    child: Row(
+                      children: [
+                        Icon(CupertinoIcons.delete, size: 20, color: AppTheme.red),
+                        SizedBox(width: 12),
+                        Text('Eliminar'),
+                      ],
+                    ),
+                  ),
+                ],
+                onSelected: (value) {
+                  if (value == 'ver') {
+                    _verDetallePaciente(paciente);
+                  } else if (value == 'ficha') {
+                    Navigator.of(context).pushNamed('/ficha-medica/${paciente.idPaciente}');
+                  } else if (value == 'editar') {
+                    _editarPaciente(paciente);
+                  } else if (value == 'eliminar') {
+                    _eliminarPaciente(paciente);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
